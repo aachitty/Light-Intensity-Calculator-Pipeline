@@ -145,19 +145,43 @@ def calculate_light_settings_skypanels60(desired_t_stop, input_iso, input_framer
     REFERENCE_FRAMERATE = 24    # Film standard framerate
     REFERENCE_SHUTTER = 180     # 180-degree shutter angle
     
-    # Calculate relative exposure factor from camera settings (compared to reference)
-    exposure_factor = (
-        (REFERENCE_T_STOP / desired_t_stop) ** 2 *  # T-stop (aperture squared)
-        (REFERENCE_ISO / input_iso) *               # ISO (linear relationship)
-        (input_framerate / REFERENCE_FRAMERATE)     # Framerate (affects exposure time)
+    # Calculate exposure time based on framerate and 180° shutter angle
+    # Exposure time (in seconds) = (1/framerate) * (shutter_angle/360)
+    exposure_time = (1/input_framerate) * (180/360)
+    reference_exposure_time = (1/REFERENCE_FRAMERATE) * (180/360)
+    
+    # Using the formula FC = (25 * f²) / (exp * ISO)
+    # Where:
+    # - FC is foot-candles (illuminance)
+    # - f is the f-stop number (T-stop in our case)
+    # - exp is the exposure time in seconds
+    # - ISO is the ISO sensitivity
+    #
+    # For our calculation, we need to determine the ratio between our settings and reference settings
+    # to adjust the illuminance required
+    
+    # For reference settings, FC_ref = (25 * REFERENCE_T_STOP²) / (reference_exp_time * REFERENCE_ISO)
+    # For input settings, FC_input = (25 * desired_t_stop²) / (exposure_time * input_ISO)
+    
+    # The ratio FC_input / FC_ref gives us our adjustment factor:
+    illuminance_factor = (
+        (desired_t_stop**2 * reference_exposure_time * REFERENCE_ISO) /
+        (REFERENCE_T_STOP**2 * exposure_time * input_iso)
     )
     
     # Get the reference illuminance at 3 meters (a middle value from our data)
     reference_distance = 3.0
     reference_illuminance = skypanel_data[diffusion][int(reference_distance)][color_temp]
     
-    # Calculate required illuminance based on exposure factor
-    required_illuminance = reference_illuminance * exposure_factor
+    # Convert lux to foot-candles (1 lux = 0.0929 fc)
+    reference_fc = reference_illuminance * 0.0929
+    
+    # Calculate required illuminance based on the formula FC = (25 * f²) / (exp * ISO)
+    # We use illuminance_factor to adjust our reference value
+    required_fc = reference_fc * illuminance_factor
+    
+    # Convert back to lux for our calculations (1 fc = 10.764 lux)
+    required_illuminance = required_fc * 10.764
     
     # Initialize exposure warning flag
     exposure_warning = None
