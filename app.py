@@ -137,7 +137,7 @@ def calculate_light_settings_skypanels60(desired_t_stop, input_iso, input_framer
         preferred_intensity: If specified, calculate distance at this intensity
         
     Returns:
-        Tuple of (distance, intensity_percentage)
+        Tuple of (distance, intensity_percentage, exposure_warning)
     """
     # Reference camera settings (base exposure)
     REFERENCE_T_STOP = 4.0      # A common middle T-stop
@@ -159,6 +159,9 @@ def calculate_light_settings_skypanels60(desired_t_stop, input_iso, input_framer
     # Calculate required illuminance based on exposure factor
     required_illuminance = reference_illuminance * exposure_factor
     
+    # Initialize exposure warning flag
+    exposure_warning = None
+    
     # If preferred_distance is specified, calculate intensity at that distance
     if preferred_distance is not None:
         # Calculate required intensity at the preferred distance using inverse square law
@@ -176,14 +179,19 @@ def calculate_light_settings_skypanels60(desired_t_stop, input_iso, input_framer
         # Calculate required intensity percentage to get required_illuminance at preferred_distance
         intensity_percentage = (required_illuminance / illuminance_at_preferred) * 100
         
-        # Clamp intensity between 10% and 100%
-        intensity_percentage = min(100.0, max(10.0, intensity_percentage))
-        
-        return preferred_distance, round(intensity_percentage, 1)
+        # Check if we're in a difficult exposure situation
+        if intensity_percentage > 100:
+            exposure_warning = "insufficient_light"
+            intensity_percentage = 100.0  # Cap at 100%
+        elif intensity_percentage < 10:
+            exposure_warning = "too_much_light"
+            intensity_percentage = 10.0  # Cap at minimum
+            
+        return preferred_distance, round(intensity_percentage, 1), exposure_warning
     
     # If preferred_intensity is specified, calculate distance at that intensity
     elif preferred_intensity is not None:
-        # Calculate the illuminance we can achieve at 1 meter with preferred intensity
+        # Calculate the illuminance we can achieve at reference distance with preferred intensity
         distances = np.array(list(skypanel_data[diffusion].keys()))
         illuminances = np.array([skypanel_data[diffusion][d][color_temp] for d in distances])
         
@@ -198,17 +206,23 @@ def calculate_light_settings_skypanels60(desired_t_stop, input_iso, input_framer
         achievable_illuminance = (preferred_intensity / 100) * max_illuminance_at_ref
         
         # Calculate the distance needed to get required_illuminance with achievable_illuminance
-        # Using inverse square law: d = sqrt(achievable_illuminance / required_illuminance) * ref_distance
         if achievable_illuminance < required_illuminance:
             # Can't achieve required illuminance at the preferred intensity
-            distance = ref_distance * 0.5  # Get as close as possible
+            exposure_warning = "insufficient_light"
+            # Get as close as possible (minimum distance)
+            distance = 1.0
         else:
             distance = ref_distance * math.sqrt(achievable_illuminance / required_illuminance)
+            
+            # Check if distance is too far (beyond practical range)
+            if distance > 15.0:
+                exposure_warning = "too_far"
+                distance = 15.0  # Cap at maximum practical distance
         
         # Ensure minimum distance of 1 meter
         distance = max(1.0, distance)
         
-        return round(distance, 2), preferred_intensity
+        return round(distance, 2), preferred_intensity, exposure_warning
     
     # Auto calculation mode
     else:
@@ -216,6 +230,15 @@ def calculate_light_settings_skypanels60(desired_t_stop, input_iso, input_framer
         ideal_distance, intensity_percentage = get_distance_for_illuminance(
             required_illuminance, diffusion, color_temp, interp_funcs
         )
+        
+        # Check exposure conditions
+        if ideal_distance > 15.0:
+            exposure_warning = "too_far"
+            ideal_distance = 15.0  # Cap at maximum practical distance
+        elif ideal_distance <= 1.0 and intensity_percentage >= 100:
+            exposure_warning = "insufficient_light"
+        elif ideal_distance >= 9.0 and intensity_percentage <= 10:
+            exposure_warning = "too_much_light"
         
         # Adjust distance and intensity to keep within practical ranges
         # Minimum distance is 1 meter
@@ -228,7 +251,7 @@ def calculate_light_settings_skypanels60(desired_t_stop, input_iso, input_framer
         ideal_distance = round(ideal_distance, 2)
         intensity_percentage = round(intensity_percentage, 1)
         
-        return ideal_distance, intensity_percentage
+        return ideal_distance, intensity_percentage, exposure_warning
 
 # Create the interpolation functions
 try:
@@ -245,14 +268,33 @@ with st.form("light_calculator_form"):
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        # Standard T-stop values used in cinematography
-        t_stop_options = [1.4, 2.0, 2.8, 4.0, 5.6, 8.0, 11.0, 16.0, 22.0, 32.0]
-        t_stop = st.selectbox(
-            "T-Stop",
-            options=t_stop_options,
-            index=2,  # Default to 2.8
-            help="Standard T-stops used in cinematography"
+        # T-stop input method selection
+        t_stop_input_method = st.radio(
+            "T-Stop Input Method", 
+            ["Standard Values", "Custom Value"],
+            horizontal=True
         )
+        
+        if t_stop_input_method == "Standard Values":
+            # Standard T-stop values used in cinematography
+            t_stop_options = [1.4, 2.0, 2.8, 4.0, 5.6, 8.0, 11.0, 16.0, 22.0, 32.0]
+            t_stop = st.selectbox(
+                "T-Stop",
+                options=t_stop_options,
+                index=2,  # Default to 2.8
+                help="Standard T-stops used in cinematography"
+            )
+        else:
+            # Custom T-stop input
+            t_stop = st.number_input(
+                "Custom T-Stop",
+                min_value=0.8,
+                max_value=32.0,
+                value=2.8,
+                step=0.1,
+                format="%.1f",
+                help="Enter a custom T-stop value for specialty lenses"
+            )
     
     with col2:
         iso = st.number_input(
@@ -342,7 +384,7 @@ if calculate_button or 'distance' in st.session_state:
             calculation_mode_text = "with automatically optimized settings"
         
         # Calculate the light settings
-        distance, intensity = calculate_light_settings_skypanels60(
+        distance, intensity, exposure_warning = calculate_light_settings_skypanels60(
             t_stop, iso, framerate, diffusion, color_temp, interp_funcs,
             preferred_distance_arg, preferred_intensity_arg
         )
@@ -351,6 +393,7 @@ if calculate_button or 'distance' in st.session_state:
         st.session_state.distance = distance
         st.session_state.intensity = intensity
         st.session_state.calc_mode = calc_mode
+        st.session_state.exposure_warning = exposure_warning
         
         # Display results in a nice format
         st.markdown("---")
@@ -375,6 +418,40 @@ if calculate_button or 'distance' in st.session_state:
             )
             st.caption("Percentage of maximum output")
         
+        # Display exposure warnings if present
+        if exposure_warning == "insufficient_light":
+            st.warning("""
+            **Underexposure Warning**: The calculated settings may result in underexposure.
+            
+            Consider one or more of these solutions:
+            - Use a higher ISO setting
+            - Use a wider aperture (lower T-stop)
+            - Use the Intensifier diffusion panel
+            - Add additional lights
+            - Move the light closer to the subject
+            """)
+        elif exposure_warning == "too_much_light":
+            st.warning("""
+            **Overexposure Warning**: The calculated settings may result in overexposure.
+            
+            Consider one or more of these solutions:
+            - Use a lower ISO setting
+            - Use a narrower aperture (higher T-stop)
+            - Use the Heavy diffusion panel
+            - Move the light farther from the subject
+            - Use additional diffusion or ND filters
+            """)
+        elif exposure_warning == "too_far":
+            st.warning("""
+            **Practical Range Warning**: The calculated distance exceeds practical range.
+            
+            The light has been placed at 15 meters (maximum recommended distance), but the intensity
+            may still need to be adjusted for proper exposure. Consider the following solutions:
+            - Use a higher ISO setting
+            - Use a wider aperture (lower T-stop)
+            - Use the Intensifier diffusion panel
+            """)
+            
         # Add explanatory text
         st.markdown(f"""
         ### Interpretation
