@@ -1,5 +1,7 @@
 import streamlit as st
 import math
+import numpy as np
+from scipy import interpolate
 
 # Page configuration
 st.set_page_config(
@@ -16,64 +18,154 @@ st.subheader("ARRI SkyPanel S60-C Light Calculator")
 st.write("""
 This tool helps cinematographers calculate the optimal light placement and intensity
 for achieving desired exposure settings. Enter your camera parameters below to get 
-precise light setup recommendations.
+precise light setup recommendations based on actual ARRI SkyPanel S60-C photometric data.
 """)
 
-def calculate_light_settings_skypanels60(desired_t_stop, input_iso, input_framerate):
-    # Reference constants from camera setup
-    REFERENCE_ILLUMINANCE = 4225.0   # lux (base light level at reference settings)
-    REFERENCE_T_STOP = 16.03         # reference T-stop (from lens aperture)
-    REFERENCE_ISO = 800              # reference ISO (from film exposure index)
-    REFERENCE_FRAMERATE = 24         # reference framerate (fps)
-    
-    # Derived from empirical data points using the inverse square law
-    LUMINOUS_INTENSITY = 11350.0     # lux·m² (measured light output)
-    MAX_LIGHT_INTENSITY = 45288.0    # Max output of ARRI SkyPanel S60-C
+# SkyPanel S60-C photometric data
+skypanel_data = {
+    "Standard": {
+        3: {"3200K": 1305, "5600K": 1535},
+        5: {"3200K": 470, "5600K": 553},
+        7: {"3200K": 240, "5600K": 282},
+        9: {"3200K": 145, "5600K": 171}
+    },
+    "Lite": {
+        3: {"3200K": 1328, "5600K": 1561},
+        5: {"3200K": 478, "5600K": 562},
+        7: {"3200K": 244, "5600K": 287},
+        9: {"3200K": 148, "5600K": 173}
+    },
+    "Heavy": {
+        3: {"3200K": 1031, "5600K": 1213},
+        5: {"3200K": 371, "5600K": 437},
+        7: {"3200K": 189, "5600K": 223},
+        9: {"3200K": 115, "5600K": 135}
+    },
+    "Intensifier": {
+        3: {"3200K": 2011, "5600K": 2431},
+        5: {"3200K": 724, "5600K": 875},
+        7: {"3200K": 369, "5600K": 447},
+        9: {"3200K": 223, "5600K": 270}
+    }
+}
 
-    # Calculate required illuminance using only aperture, ISO, and framerate.
-    illuminance_ratio = (
-        (REFERENCE_T_STOP / desired_t_stop) ** 2 *  # Aperture factor (inverse square law)
-        (REFERENCE_ISO / input_iso) *               # ISO factor (linear relationship)
-        (input_framerate / REFERENCE_FRAMERATE)     # Framerate factor (substitutes for exposure time at 180° shutter)
+# Create intensity interpolation functions for each diffusion and color temperature
+def create_interpolation_functions():
+    interp_funcs = {}
+    
+    for diffusion in skypanel_data:
+        interp_funcs[diffusion] = {}
+        
+        for cct in ["3200K", "5600K"]:
+            distances = []
+            illuminances = []
+            
+            for distance, cct_values in skypanel_data[diffusion].items():
+                distances.append(distance)
+                illuminances.append(cct_values[cct])
+            
+            # Convert lists to numpy arrays for interpolation
+            distances = np.array(distances)
+            illuminances = np.array(illuminances)
+            
+            # Create interpolation function (using inverse square law relationship)
+            # We'll interpolate distance -> illuminance
+            interp_funcs[diffusion][cct] = interpolate.interp1d(
+                distances, 
+                illuminances, 
+                kind='quadratic',
+                bounds_error=False,
+                fill_value=(illuminances[0], illuminances[-1])
+            )
+    
+    return interp_funcs
+
+# Create reverse interpolation for illuminance -> distance
+def get_distance_for_illuminance(illuminance, diffusion, color_temp, interp_funcs):
+    # Get the measured distances and corresponding illuminances
+    distances = list(skypanel_data[diffusion].keys())
+    illuminances = [skypanel_data[diffusion][d][color_temp] for d in distances]
+    
+    # We don't use the interpolation function directly here because we need the inverse
+    # relationship. Instead, we'll use the inverse square law to estimate distance
+    
+    # First, let's find the closest measured points
+    distances = np.array(distances)
+    illuminances = np.array(illuminances)
+    
+    # Ensure we're within the reasonable range of our data
+    max_illuminance = max(illuminances)
+    min_illuminance = min(illuminances)
+    
+    if illuminance > max_illuminance:
+        # If we need more light than available at the closest distance, we need to increase intensity
+        return min(distances), illuminance / max_illuminance * 100
+    
+    if illuminance < min_illuminance:
+        # If we need less light than available at the farthest distance, we need to decrease intensity
+        return max(distances), illuminance / min_illuminance * 100
+    
+    # For values within our measurement range, we'll use inverse square law interpolation
+    # Find the reference point with closest illuminance
+    idx = np.abs(illuminances - illuminance).argmin()
+    ref_distance = distances[idx]
+    ref_illuminance = illuminances[idx]
+    
+    # Use inverse square law: illuminance ∝ 1/distance²
+    # If ref_illuminance is at ref_distance, then illuminance should be at:
+    calculated_distance = ref_distance * math.sqrt(ref_illuminance / illuminance)
+    
+    # Ensure minimum distance is 1 meter
+    calculated_distance = max(1.0, calculated_distance)
+    
+    # At this point, intensity is assumed to be 100% (we haven't adjusted it)
+    return calculated_distance, 100.0
+
+def calculate_light_settings_skypanels60(desired_t_stop, input_iso, input_framerate, diffusion, color_temp, interp_funcs):
+    # Reference camera settings (base exposure)
+    REFERENCE_T_STOP = 4.0      # A common middle T-stop
+    REFERENCE_ISO = 800         # Standard cinema camera ISO
+    REFERENCE_FRAMERATE = 24    # Film standard framerate
+    REFERENCE_SHUTTER = 180     # 180-degree shutter angle
+    
+    # Calculate relative exposure factor from camera settings (compared to reference)
+    exposure_factor = (
+        (REFERENCE_T_STOP / desired_t_stop) ** 2 *  # T-stop (aperture squared)
+        (REFERENCE_ISO / input_iso) *               # ISO (linear relationship)
+        (input_framerate / REFERENCE_FRAMERATE)     # Framerate (affects exposure time)
     )
     
-    required_illuminance = REFERENCE_ILLUMINANCE * illuminance_ratio
-
-    # Calculate ideal distance using inverse square law: E = I / d² → d = √(I/E)
-    ideal_distance = math.sqrt(LUMINOUS_INTENSITY / required_illuminance)
-
-    # Enforce minimum distance of 1 meter
-    if ideal_distance < 1.0:
-        ideal_distance = 1.0
+    # Get the reference illuminance at 3 meters (a middle value from our data)
+    reference_distance = 3.0
+    reference_illuminance = skypanel_data[diffusion][reference_distance][color_temp]
     
-    # Calculate required luminous intensity at the chosen distance
-    required_intensity = required_illuminance * (ideal_distance ** 2)
-
-    # Convert intensity to percentage
-    intensity_percentage = (required_intensity / MAX_LIGHT_INTENSITY) * 100
-
-    # Adjust distance to keep intensity within 30%-80% range
-    while intensity_percentage > 80 and ideal_distance < 15:  # Move light farther if too bright
-        ideal_distance += 0.1
-        required_intensity = required_illuminance * (ideal_distance ** 2)
-        intensity_percentage = (required_intensity / MAX_LIGHT_INTENSITY) * 100
-
-    while intensity_percentage < 30 and ideal_distance > 1.0:  # Move light closer if too dim
-        ideal_distance -= 0.1
-        required_intensity = required_illuminance * (ideal_distance ** 2)
-        intensity_percentage = (required_intensity / MAX_LIGHT_INTENSITY) * 100
-
-    # Ensure values are within 30%-80% range or as close as possible
-    if intensity_percentage > 80:
-        intensity_percentage = 80
-    elif intensity_percentage < 30:
-        intensity_percentage = 30
-
+    # Calculate required illuminance based on exposure factor
+    required_illuminance = reference_illuminance * exposure_factor
+    
+    # Get ideal distance for the required illuminance
+    ideal_distance, intensity_percentage = get_distance_for_illuminance(
+        required_illuminance, diffusion, color_temp, interp_funcs
+    )
+    
+    # Adjust distance and intensity to keep within practical ranges
+    # Minimum distance is 1 meter
+    ideal_distance = max(1.0, ideal_distance)
+    
+    # Clamp intensity between 10% and 100%
+    intensity_percentage = min(100.0, max(10.0, intensity_percentage))
+    
     # Round values for clarity
     ideal_distance = round(ideal_distance, 2)
-    intensity_percentage = round(intensity_percentage, 2)
-
+    intensity_percentage = round(intensity_percentage, 1)
+    
     return ideal_distance, intensity_percentage
+
+# Create the interpolation functions
+try:
+    interp_funcs = create_interpolation_functions()
+except Exception as e:
+    st.error(f"Error initializing interpolation functions: {str(e)}")
+    st.stop()
 
 # Create a form for user input
 with st.form("light_calculator_form"):
@@ -113,6 +205,25 @@ with st.form("light_calculator_form"):
             help="Standard framerates: 24 (film), 25 (PAL), 30 (NTSC), 60 (high speed)"
         )
     
+    st.subheader("Light Settings")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        diffusion = st.selectbox(
+            "Diffusion Type",
+            options=["Standard", "Lite", "Heavy", "Intensifier"],
+            index=0,  # Default to Standard
+            help="Different diffusion panels affect light intensity and quality"
+        )
+    
+    with col2:
+        color_temp = st.selectbox(
+            "Color Temperature",
+            options=["3200K", "5600K"],
+            index=1,  # Default to 5600K (daylight)
+            help="3200K (tungsten) or 5600K (daylight)"
+        )
+    
     # Submit button
     calculate_button = st.form_submit_button("Calculate Light Settings")
 
@@ -120,7 +231,9 @@ with st.form("light_calculator_form"):
 if calculate_button or 'distance' in st.session_state:
     try:
         # Calculate the light settings
-        distance, intensity = calculate_light_settings_skypanels60(t_stop, iso, framerate)
+        distance, intensity = calculate_light_settings_skypanels60(
+            t_stop, iso, framerate, diffusion, color_temp, interp_funcs
+        )
         
         # Store calculation results in session state
         st.session_state.distance = distance
@@ -153,21 +266,21 @@ if calculate_button or 'distance' in st.session_state:
         st.markdown(f"""
         ### Interpretation
         
-        To expose your subject at T-{t_stop} with ISO {iso} and {framerate} fps:
+        To expose your subject at T-{t_stop} with ISO {iso} and {framerate} fps using {diffusion} diffusion at {color_temp}:
         
         1. Position your ARRI SkyPanel S60-C **{distance} meters** from the subject
         2. Set the light intensity to **{intensity}%** of maximum output
         
-        These settings will provide optimal exposure based on the inverse square law and the technical specifications of the ARRI SkyPanel S60-C.
+        These settings will provide proper exposure based on actual photometric data from the ARRI SkyPanel S60-C and the inverse square law.
         """)
         
         # Add notes about limitations
         st.info("""
         **Note:** This calculator assumes:
         - 180° shutter angle
-        - No additional light modifiers (softboxes, diffusion, etc.)
         - A single key light setup
-        - Perfect reflectivity of subject
+        - Calculations based on measured photometric data from ARRI
+        - Inverse square law for distance interpolation
         
         Adjust your final settings based on artistic intent and practical considerations.
         """)
