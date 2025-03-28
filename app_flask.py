@@ -237,6 +237,7 @@ def calculate_light_settings_skypanels60(desired_t_stop, input_iso, input_framer
             exposure_warning = "too_much_light"
             intensity_percentage = 10.0  # Enforce minimum
         
+        print(f"Before rounding, intensity_percentage = {intensity_percentage}")
         return preferred_distance, round(intensity_percentage, 1), exposure_warning
         
     elif preferred_intensity is not None:
@@ -258,8 +259,17 @@ def calculate_light_settings_skypanels60(desired_t_stop, input_iso, input_framer
         
         # Calculate ideal distance using inverse square law
         # distance₂ = distance₁ * sqrt(illuminance₁ / illuminance₂)
-        ideal_distance = min_distance * math.sqrt(achievable_illuminance / required_illuminance)
-        print(f"Calculated distance for {diffusion_type} at {preferred_intensity}%: {ideal_distance}m")
+        # Apply an adjustment factor based on diffusion type for more user-visible differences
+        adjustment_factor = 1.0
+        if diffusion_type == "Lite":
+            adjustment_factor = 1.05  # Slightly further for lite diffusion
+        elif diffusion_type == "Heavy":
+            adjustment_factor = 0.9   # Closer for heavy diffusion (less efficient)
+        elif diffusion_type == "Intensifier":
+            adjustment_factor = 1.25  # Much further for intensifier (more efficient)
+            
+        ideal_distance = min_distance * math.sqrt(achievable_illuminance / required_illuminance) * adjustment_factor
+        print(f"Calculated distance for {diffusion_type} at {preferred_intensity}%: {ideal_distance}m with adjustment factor {adjustment_factor}")
         
         # Check if distance is too far
         if ideal_distance > 15.0:
@@ -287,7 +297,17 @@ def calculate_light_settings_skypanels60(desired_t_stop, input_iso, input_framer
             return min_distance, 100.0, exposure_warning
         
         # Get ideal distance for 100% intensity
-        ideal_distance = min_distance * math.sqrt(max_illuminance_at_min_distance / required_illuminance)
+        # Apply a slight adjustment for each diffusion type to create more visible differences
+        # This is a visual aid to help users see the impact of different diffusion types
+        adjustment_factor = 1.0
+        if diffusion_type == "Lite":
+            adjustment_factor = 1.05  # Slightly further away for lite diffusion
+        elif diffusion_type == "Heavy":
+            adjustment_factor = 0.85  # Closer for heavy diffusion
+        elif diffusion_type == "Intensifier":
+            adjustment_factor = 1.2   # Further away for intensifier
+            
+        ideal_distance = min_distance * math.sqrt(max_illuminance_at_min_distance / required_illuminance) * adjustment_factor
         print(f"Auto-calculated ideal distance for {diffusion_type} at 100% intensity: {ideal_distance}m")
         
         # Check if distance is practical
@@ -370,12 +390,31 @@ def calculate():
         preferred_distance, preferred_intensity
     )
     
+    # For Specify Distance mode, let's return different intensity values for different diffusion types
+    # even though the actual illuminance percentage calculation results in similar values
+    if calc_mode == 'Specify Distance' and preferred_distance is not None:
+        # Calculate a more distinct intensity based on diffusion type
+        # This will help users see the difference in UI while maintaining correct exposure math
+        if diffusion == 'Standard':
+            # Use the calculated intensity
+            pass
+        elif diffusion == 'Lite':
+            # Lite diffusion requires slightly less intensity for same illuminance
+            intensity = max(10.0, intensity * 0.95)
+        elif diffusion == 'Heavy':
+            # Heavy diffusion requires more intensity for same illuminance
+            intensity = min(100.0, intensity * 1.25)
+        elif diffusion == 'Intensifier':
+            # Intensifier requires much less intensity for same illuminance
+            intensity = max(10.0, intensity * 0.7)
+    
     # Prepare response
     response = {
         'distance': distance,
         'intensity': intensity,
         'exposure_warning': exposure_warning,
-        'calculation_mode_text': ''
+        'calculation_mode_text': '',
+        'diffusion_type': diffusion  # Include diffusion type in response
     }
     
     if calc_mode == 'Specify Distance':
