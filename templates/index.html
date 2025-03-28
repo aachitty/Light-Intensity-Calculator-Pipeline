@@ -6,38 +6,114 @@
     <title>Cinematographer's Light Calculator</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
+        /* Streamlit-like theme */
+        :root {
+            --primary-color: #4059AD;
+            --secondary-color: #6B9AC4;
+            --background-color: #f7f7f7;
+            --card-bg-color: #ffffff;
+            --text-color: #2e2e2e;
+            --accent-color: #FF4B4B;
+            --success-color: #0CCE6B;
+        }
+        
+        body {
+            font-family: 'Source Sans Pro', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+        }
+        
         .container {
             max-width: 800px;
             margin-top: 30px;
         }
+        
         .card {
             margin-bottom: 20px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 0.5rem;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            background-color: var(--card-bg-color);
         }
-        .result-card {
-            display: none;
+        
+        .card-header {
+            border-radius: 0.5rem 0.5rem 0 0 !important;
+            font-weight: 600;
         }
+        
+        .bg-primary {
+            background-color: var(--primary-color) !important;
+        }
+        
+        .bg-success {
+            background-color: var(--success-color) !important;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        
+        .btn-primary:hover {
+            background-color: #344e9a;
+            border-color: #344e9a;
+        }
+        
+        .form-control, .form-select {
+            border-radius: 0.3rem;
+            border: 1px solid #ced4da;
+        }
+        
+        .form-range::-webkit-slider-thumb {
+            background: var(--primary-color);
+        }
+        
+        .alert-warning {
+            background-color: #fff3cd;
+            border-color: #ffeeba;
+        }
+        
+        .alert-info {
+            background-color: #d1ecf1;
+            border-color: #bee5eb;
+        }
+        
         .header-logo {
             height: 50px;
             margin-right: 15px;
         }
+        
+        .result-card {
+            display: none;
+        }
+        
         .warning-box {
             display: none;
             margin-top: 20px;
+            border-radius: 0.3rem;
         }
+        
         .custom-t-stop-input {
             display: none;
         }
+        
         #loadingSpinner {
             display: none;
         }
+        
+        h1, h2, h3, h4, h5, h6 {
+            font-weight: 600;
+        }
+        
         footer {
             margin-top: 50px;
             padding: 20px 0;
-            background-color: #f8f9fa;
+            background-color: #f0f2f6;
             font-size: 0.9rem;
+            border-top: 1px solid #e6e9ef;
         }
     </style>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="container">
