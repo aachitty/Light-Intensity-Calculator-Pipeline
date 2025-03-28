@@ -2,6 +2,7 @@ import streamlit as st
 import math
 import numpy as np
 from scipy import interpolate
+import time  # For adding timestamp to force recalculation
 
 # Page configuration
 st.set_page_config(
@@ -385,13 +386,16 @@ with col3:
 st.subheader("Light Settings")
 col1, col2 = st.columns(2)
 
+# Add a key with timestamp to force re-render
+timestamp = int(time.time() * 1000)
+
 with col1:
     diffusion = st.selectbox(
         "Diffusion Type",
         options=["Standard", "Lite", "Heavy", "Intensifier"],
         index=0,  # Default to Standard
         help="Different diffusion panels affect light intensity and quality",
-        key="diffusion_type"
+        key=f"diffusion_type_{timestamp}"
     )
 
 with col2:
@@ -400,7 +404,7 @@ with col2:
         options=["3200K", "5600K"],
         index=1,  # Default to 5600K (daylight)
         help="3200K (tungsten) or 5600K (daylight)",
-        key="color_temp_select"
+        key=f"color_temp_select_{timestamp}"
     )
 
 # Calculation Mode Selection
