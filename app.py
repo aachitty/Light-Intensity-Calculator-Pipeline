@@ -419,21 +419,44 @@ if 'last_color_temp' in st.session_state:
         color_temp_index = 1
 
 with col1:
+    # Create a callback for diffusion type changes
+    if "diffusion_type" not in st.session_state:
+        st.session_state.diffusion_type = ["Standard", "Lite", "Heavy", "Intensifier"][diffusion_index]
+        
+    def on_diffusion_change():
+        # This will be called when the diffusion type changes
+        # Store the old and new values to check for changes
+        old_diffusion = st.session_state.get("last_diffusion", "Standard")
+        new_diffusion = st.session_state.diffusion_type
+        st.session_state.diffusion_changed = old_diffusion != new_diffusion
+        
     diffusion = st.selectbox(
         "Diffusion Type",
         options=["Standard", "Lite", "Heavy", "Intensifier"],
         index=diffusion_index,  # Use remembered value
         help="Different diffusion panels affect light intensity and quality",
-        key="diffusion_type"
+        key="diffusion_type",
+        on_change=on_diffusion_change
     )
 
 with col2:
+    # Create a callback for color temperature changes
+    if "color_temp_select" not in st.session_state:
+        st.session_state.color_temp_select = ["3200K", "5600K"][color_temp_index]
+        
+    def on_color_temp_change():
+        # This will be called when the color temp changes
+        old_color_temp = st.session_state.get("last_color_temp", "5600K")
+        new_color_temp = st.session_state.color_temp_select
+        st.session_state.color_temp_changed = old_color_temp != new_color_temp
+    
     color_temp = st.selectbox(
         "Color Temperature",
         options=["3200K", "5600K"],
         index=color_temp_index,  # Use remembered value
         help="3200K (tungsten) or 5600K (daylight)",
-        key="color_temp_select"
+        key="color_temp_select",
+        on_change=on_color_temp_change
     )
 
 # Calculation Mode Selection
@@ -475,15 +498,37 @@ elif calc_mode == "Specify Intensity":
 calculate_button = st.button("Calculate Light Settings")
 
 # Check if any setting has changed or Calculate button pressed, then recalculate
-has_diffusion_changed = 'last_diffusion' not in st.session_state or st.session_state.last_diffusion != diffusion
-has_color_temp_changed = 'last_color_temp' not in st.session_state or st.session_state.last_color_temp != color_temp
+# Use the on_change flags when available to detect real changes
+diffusion_changed = st.session_state.get("diffusion_changed", False)
+color_temp_changed = st.session_state.get("color_temp_changed", False)
+
+# Traditional change detection as backup
+has_diffusion_changed = diffusion_changed or 'last_diffusion' not in st.session_state or st.session_state.last_diffusion != diffusion
+has_color_temp_changed = color_temp_changed or 'last_color_temp' not in st.session_state or st.session_state.last_color_temp != color_temp
 has_t_stop_changed = 'last_t_stop' not in st.session_state or st.session_state.last_t_stop != t_stop
 has_iso_changed = 'last_iso' not in st.session_state or st.session_state.last_iso != iso
 has_framerate_changed = 'last_framerate' not in st.session_state or st.session_state.last_framerate != framerate
 has_calc_mode_changed = 'last_calc_mode' not in st.session_state or st.session_state.last_calc_mode != calc_mode
 
+# Debug flagging for changes
+if has_diffusion_changed:
+    st.session_state.debug_diffusion = f"Changed from {st.session_state.get('last_diffusion', 'None')} to {diffusion}"
+
+# Add debug info to help see what's happening with the diffusion selector
+if 'debug_diffusion' in st.session_state:
+    st.write(f"Debug: {st.session_state.debug_diffusion}")
+    
+# Reset change flags
+if diffusion_changed:
+    st.session_state.diffusion_changed = False
+if color_temp_changed:
+    st.session_state.color_temp_changed = False
+
+# Force recalculation every time by adding the current timestamp
+force_recalculate = True  # Always recalculate when any widget changes
+
 # Automatically recalculate when diffusion or color temp changes, or when Calculate button is pressed
-if calculate_button or has_diffusion_changed or has_color_temp_changed or has_t_stop_changed or has_iso_changed or has_framerate_changed or has_calc_mode_changed:
+if calculate_button or has_diffusion_changed or has_color_temp_changed or has_t_stop_changed or has_iso_changed or has_framerate_changed or has_calc_mode_changed or force_recalculate:
     try:
         # Pass preferred settings based on calculation mode
         preferred_distance_arg = None
