@@ -4,6 +4,8 @@ import numpy as np
 from scipy import interpolate
 import time  # For adding timestamp to force recalculation
 import sys  # For flush to ensure print statements display immediately
+from streamlit.runtime.scriptrunner import get_script_run_ctx
+import random  # For generating unique keys
 
 # Page configuration
 st.set_page_config(
@@ -541,7 +543,20 @@ if color_temp_changed:
 # Force recalculation every time by adding the current timestamp
 force_recalculate = True  # Always recalculate when any widget changes
 
-# Automatically recalculate when diffusion or color temp changes, or when Calculate button is pressed
+# Force a complete rerun if diffusion or color temp changes
+if has_diffusion_changed or has_color_temp_changed:
+    # Using st.experimental_rerun() is deprecated, so we add a forcing mechanism
+    print(f"Forcing rerun due to diffusion type change to: {diffusion}", flush=True)
+    # To ensure we get fresh results, we'll put current values into session state
+    st.session_state.last_t_stop = t_stop
+    st.session_state.last_iso = iso
+    st.session_state.last_framerate = framerate
+    st.session_state.last_diffusion = diffusion
+    st.session_state.last_color_temp = color_temp
+    # Force a hard rerun with new values
+    st.rerun()
+
+# Automatically recalculate when any setting changes, or when Calculate button is pressed
 if calculate_button or has_diffusion_changed or has_color_temp_changed or has_t_stop_changed or has_iso_changed or has_framerate_changed or has_calc_mode_changed or force_recalculate:
     try:
         # Pass preferred settings based on calculation mode
