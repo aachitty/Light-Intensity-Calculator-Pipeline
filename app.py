@@ -409,71 +409,50 @@ with col3:
     )
 
 st.subheader("Light Settings")
-col1, col2 = st.columns(2)
 
-# Add a key with timestamp to force re-render
-timestamp = int(time.time() * 1000)
-
-# Get the index of the last diffusion if it exists
-diffusion_index = 0  # Default to Standard
-if 'last_diffusion' in st.session_state:
-    if st.session_state.last_diffusion == "Standard":
-        diffusion_index = 0
-    elif st.session_state.last_diffusion == "Lite":
-        diffusion_index = 1
-    elif st.session_state.last_diffusion == "Heavy":
-        diffusion_index = 2
-    elif st.session_state.last_diffusion == "Intensifier":
-        diffusion_index = 3
-
-# Get the index of the last color temp if it exists
-color_temp_index = 1  # Default to 5600K
-if 'last_color_temp' in st.session_state:
-    if st.session_state.last_color_temp == "3200K":
-        color_temp_index = 0
-    elif st.session_state.last_color_temp == "5600K":
-        color_temp_index = 1
-
-with col1:
-    # Create a callback for diffusion type changes
-    if "diffusion_type" not in st.session_state:
-        st.session_state.diffusion_type = ["Standard", "Lite", "Heavy", "Intensifier"][diffusion_index]
-        
-    def on_diffusion_change():
-        # This will be called when the diffusion type changes
-        # Store the old and new values to check for changes
-        old_diffusion = st.session_state.get("last_diffusion", "Standard")
-        new_diffusion = st.session_state.diffusion_type
-        st.session_state.diffusion_changed = old_diffusion != new_diffusion
-        
-    diffusion = st.selectbox(
-        "Diffusion Type",
-        options=["Standard", "Lite", "Heavy", "Intensifier"],
-        index=diffusion_index,  # Use remembered value
-        help="Different diffusion panels affect light intensity and quality",
-        key="diffusion_type",
-        on_change=on_diffusion_change
-    )
-
-with col2:
-    # Create a callback for color temperature changes
-    if "color_temp_select" not in st.session_state:
-        st.session_state.color_temp_select = ["3200K", "5600K"][color_temp_index]
-        
-    def on_color_temp_change():
-        # This will be called when the color temp changes
-        old_color_temp = st.session_state.get("last_color_temp", "5600K")
-        new_color_temp = st.session_state.color_temp_select
-        st.session_state.color_temp_changed = old_color_temp != new_color_temp
+# Create a form for the diffusion and color settings
+# This ensures that all inputs are submitted together and processed as a batch
+with st.form(key="light_settings_form"):
+    col1, col2 = st.columns(2)
     
-    color_temp = st.selectbox(
-        "Color Temperature",
-        options=["3200K", "5600K"],
-        index=color_temp_index,  # Use remembered value
-        help="3200K (tungsten) or 5600K (daylight)",
-        key="color_temp_select",
-        on_change=on_color_temp_change
-    )
+    with col1:
+        diffusion = st.selectbox(
+            "Diffusion Type",
+            options=["Standard", "Lite", "Heavy", "Intensifier"],
+            index=0,  # Default to Standard
+            help="Different diffusion panels affect light intensity and quality"
+        )
+    
+    with col2:
+        color_temp = st.selectbox(
+            "Color Temperature",
+            options=["3200K", "5600K"],
+            index=1,  # Default to 5600K (daylight)
+            help="3200K (tungsten) or 5600K (daylight)"
+        )
+    
+    # Add a submit button to the form
+    diffusion_submit = st.form_submit_button("Apply Light Settings")
+    
+    # If the form is submitted, save the values
+    if diffusion_submit:
+        st.session_state.diffusion = diffusion
+        st.session_state.color_temp = color_temp
+        st.session_state.diffusion_changed = True
+        st.session_state.color_temp_changed = True
+        
+# After form submission, ensure we're using the selected values
+if 'diffusion' in st.session_state:
+    diffusion = st.session_state.diffusion
+else:
+    diffusion = "Standard"
+    st.session_state.diffusion = diffusion
+    
+if 'color_temp' in st.session_state:
+    color_temp = st.session_state.color_temp
+else:
+    color_temp = "5600K"
+    st.session_state.color_temp = color_temp
 
 # Calculation Mode Selection
 st.subheader("Calculation Mode")
