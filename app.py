@@ -309,118 +309,148 @@ except Exception as e:
     st.error(f"Error initializing interpolation functions: {str(e)}")
     st.stop()
 
-# Create a form for user input
-with st.form("light_calculator_form", clear_on_submit=False):
-    st.subheader("Camera Settings")
-    
-    # Create three columns for input fields
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        # T-stop input method selection
-        t_stop_input_method = st.radio(
-            "T-Stop Input Method", 
-            ["Standard Values", "Custom Value"],
-            horizontal=True
-        )
-        
-        if t_stop_input_method == "Standard Values":
-            # Standard T-stop values used in cinematography
-            t_stop_options = [1.4, 2.0, 2.8, 4.0, 5.6, 8.0, 11.0, 16.0, 22.0, 32.0]
-            t_stop = st.selectbox(
-                "T-Stop",
-                options=t_stop_options,
-                index=2,  # Default to 2.8
-                help="Standard T-stops used in cinematography"
-            )
-        else:
-            # Custom T-stop input
-            t_stop = st.number_input(
-                "Custom T-Stop",
-                min_value=0.8,
-                max_value=32.0,
-                value=2.8,
-                step=0.1,
-                format="%.1f",
-                help="Enter a custom T-stop value for specialty lenses"
-            )
-    
-    with col2:
-        iso = st.number_input(
-            "ISO",
-            min_value=50,
-            max_value=25600,
-            value=800,
-            step=50,
-            help="Common ISOs: 100, 200, 400, 800, 1600, 3200"
-        )
-    
-    with col3:
-        framerate = st.number_input(
-            "Framerate (fps)",
-            min_value=12,
-            max_value=300,
-            value=24,
-            step=1,
-            help="Standard framerates: 24 (film), 25 (PAL), 30 (NTSC), 60 (high speed)"
-        )
-    
-    st.subheader("Light Settings")
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        diffusion = st.selectbox(
-            "Diffusion Type",
-            options=["Standard", "Lite", "Heavy", "Intensifier"],
-            index=0,  # Default to Standard
-            help="Different diffusion panels affect light intensity and quality"
-        )
-    
-    with col2:
-        color_temp = st.selectbox(
-            "Color Temperature",
-            options=["3200K", "5600K"],
-            index=1,  # Default to 5600K (daylight)
-            help="3200K (tungsten) or 5600K (daylight)"
-        )
-    
-    # Calculation Mode Selection
-    st.subheader("Calculation Mode")
-    calc_mode = st.radio(
-        "Choose calculation mode:",
-        ["Auto Calculate", "Specify Distance", "Specify Intensity"],
-        index=0,
-        help="Auto calculates optimal values, or you can specify your preferred distance or intensity"
+# Initialize session state
+if 'first_load' not in st.session_state:
+    st.session_state.first_load = True
+    st.session_state.diffusion = "Standard"
+    st.session_state.color_temp = "5600K"
+    st.session_state.t_stop = 2.8
+    st.session_state.iso = 800
+    st.session_state.framerate = 24
+    st.session_state.calc_mode = "Auto Calculate"
+    st.session_state.preferred_distance = 3.0
+    st.session_state.preferred_intensity = 70
+    st.session_state.t_stop_input_method = "Standard Values"
+
+# Create input widgets outside the form to detect changes
+st.subheader("Camera Settings")
+
+# Create three columns for input fields
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    # T-stop input method selection
+    t_stop_input_method = st.radio(
+        "T-Stop Input Method", 
+        ["Standard Values", "Custom Value"],
+        horizontal=True,
+        key="t_stop_method"
     )
     
-    # Based on mode selection, show additional fields
-    if calc_mode == "Specify Distance":
-        preferred_distance = st.slider(
-            "Preferred Distance (meters)",
-            min_value=1.0,
-            max_value=10.0,
-            value=3.0,
+    if t_stop_input_method == "Standard Values":
+        # Standard T-stop values used in cinematography
+        t_stop_options = [1.4, 2.0, 2.8, 4.0, 5.6, 8.0, 11.0, 16.0, 22.0, 32.0]
+        t_stop = st.selectbox(
+            "T-Stop",
+            options=t_stop_options,
+            index=2,  # Default to 2.8
+            help="Standard T-stops used in cinematography",
+            key="t_stop_select"
+        )
+    else:
+        # Custom T-stop input
+        t_stop = st.number_input(
+            "Custom T-Stop",
+            min_value=0.8,
+            max_value=32.0,
+            value=2.8,
             step=0.1,
-            help="The calculator will determine the required light intensity at this distance"
+            format="%.1f",
+            help="Enter a custom T-stop value for specialty lenses",
+            key="t_stop_custom"
         )
-    elif calc_mode == "Specify Intensity":
-        preferred_intensity = st.slider(
-            "Preferred Intensity (%)",
-            min_value=10,
-            max_value=100,
-            value=70,
-            step=1,
-            help="The calculator will determine the required distance at this intensity"
-        )
-    
-    # Add recalculate button to update results even when inputs change
-    st.markdown("**Click Calculate to update results when changing any settings**")
-    
-    # Submit button
-    calculate_button = st.form_submit_button("Calculate Light Settings")
 
-# After form submission, calculate and display results
-if calculate_button:
+with col2:
+    iso = st.number_input(
+        "ISO",
+        min_value=50,
+        max_value=25600,
+        value=800,
+        step=50,
+        help="Common ISOs: 100, 200, 400, 800, 1600, 3200",
+        key="iso_input"
+    )
+
+with col3:
+    framerate = st.number_input(
+        "Framerate (fps)",
+        min_value=12,
+        max_value=300,
+        value=24,
+        step=1,
+        help="Standard framerates: 24 (film), 25 (PAL), 30 (NTSC), 60 (high speed)",
+        key="framerate_input"
+    )
+
+st.subheader("Light Settings")
+col1, col2 = st.columns(2)
+
+with col1:
+    diffusion = st.selectbox(
+        "Diffusion Type",
+        options=["Standard", "Lite", "Heavy", "Intensifier"],
+        index=0,  # Default to Standard
+        help="Different diffusion panels affect light intensity and quality",
+        key="diffusion_type"
+    )
+
+with col2:
+    color_temp = st.selectbox(
+        "Color Temperature",
+        options=["3200K", "5600K"],
+        index=1,  # Default to 5600K (daylight)
+        help="3200K (tungsten) or 5600K (daylight)",
+        key="color_temp_select"
+    )
+
+# Calculation Mode Selection
+st.subheader("Calculation Mode")
+calc_mode = st.radio(
+    "Choose calculation mode:",
+    ["Auto Calculate", "Specify Distance", "Specify Intensity"],
+    index=0,
+    help="Auto calculates optimal values, or you can specify your preferred distance or intensity",
+    key="calc_mode_select"
+)
+
+# Based on mode selection, show additional fields
+preferred_distance = None
+preferred_intensity = None
+
+if calc_mode == "Specify Distance":
+    preferred_distance = st.slider(
+        "Preferred Distance (meters)",
+        min_value=1.0,
+        max_value=10.0,
+        value=3.0,
+        step=0.1,
+        help="The calculator will determine the required light intensity at this distance",
+        key="distance_slider"
+    )
+elif calc_mode == "Specify Intensity":
+    preferred_intensity = st.slider(
+        "Preferred Intensity (%)",
+        min_value=10,
+        max_value=100,
+        value=70,
+        step=1,
+        help="The calculator will determine the required distance at this intensity",
+        key="intensity_slider"
+    )
+
+# Calculate button
+calculate_button = st.button("Calculate Light Settings")
+
+# Check if any setting has changed or Calculate button pressed, then recalculate
+has_diffusion_changed = 'last_diffusion' not in st.session_state or st.session_state.last_diffusion != diffusion
+has_color_temp_changed = 'last_color_temp' not in st.session_state or st.session_state.last_color_temp != color_temp
+has_t_stop_changed = 'last_t_stop' not in st.session_state or st.session_state.last_t_stop != t_stop
+has_iso_changed = 'last_iso' not in st.session_state or st.session_state.last_iso != iso
+has_framerate_changed = 'last_framerate' not in st.session_state or st.session_state.last_framerate != framerate
+has_calc_mode_changed = 'last_calc_mode' not in st.session_state or st.session_state.last_calc_mode != calc_mode
+
+# Automatically recalculate when diffusion or color temp changes, or when Calculate button is pressed
+if calculate_button or has_diffusion_changed or has_color_temp_changed or has_t_stop_changed or has_iso_changed or has_framerate_changed or has_calc_mode_changed:
     try:
         # Pass preferred settings based on calculation mode
         preferred_distance_arg = None
