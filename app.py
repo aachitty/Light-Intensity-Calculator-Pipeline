@@ -163,7 +163,14 @@ def calculate_light_settings_skypanels60(desired_t_stop, input_iso, input_framer
     # For reference settings, FC_ref = (25 * REFERENCE_T_STOP²) / (reference_exp_time * REFERENCE_ISO)
     # For input settings, FC_input = (25 * desired_t_stop²) / (exposure_time * input_ISO)
     
-    # The ratio FC_input / FC_ref gives us our adjustment factor:
+    # The ratio FC_input / FC_ref gives us our adjustment factor using the formula:
+    # FC = (25 * f²) / (exp * ISO)
+    # 
+    # If we have two different camera settings, then:
+    # FC_input / FC_ref = ((25 * desired_t_stop²) / (exposure_time * input_ISO)) / ((25 * REFERENCE_T_STOP²) / (reference_exposure_time * REFERENCE_ISO))
+    # 
+    # Simplifying:
+    # FC_input / FC_ref = (desired_t_stop² * reference_exposure_time * REFERENCE_ISO) / (REFERENCE_T_STOP² * exposure_time * input_ISO)
     illuminance_factor = (
         (desired_t_stop**2 * reference_exposure_time * REFERENCE_ISO) /
         (REFERENCE_T_STOP**2 * exposure_time * input_iso)
@@ -409,7 +416,7 @@ with st.form("light_calculator_form"):
     calculate_button = st.form_submit_button("Calculate Light Settings")
 
 # After form submission, calculate and display results
-if calculate_button or 'distance' in st.session_state:
+if calculate_button:
     try:
         # Pass preferred settings based on calculation mode
         preferred_distance_arg = None
@@ -430,11 +437,23 @@ if calculate_button or 'distance' in st.session_state:
             preferred_distance_arg, preferred_intensity_arg
         )
         
-        # Store calculation results in session state
+        # Store calculation results in session state (for display purposes only)
         st.session_state.distance = distance
         st.session_state.intensity = intensity
         st.session_state.calc_mode = calc_mode
         st.session_state.exposure_warning = exposure_warning
+        
+        # Store input parameters to detect changes
+        st.session_state.last_t_stop = t_stop
+        st.session_state.last_iso = iso
+        st.session_state.last_framerate = framerate
+        st.session_state.last_diffusion = diffusion
+        st.session_state.last_color_temp = color_temp
+        st.session_state.last_calc_mode = calc_mode
+        if calc_mode == "Specify Distance":
+            st.session_state.last_preferred_distance = preferred_distance
+        elif calc_mode == "Specify Intensity":
+            st.session_state.last_preferred_intensity = preferred_intensity
         
         # Display results in a nice format
         st.markdown("---")
