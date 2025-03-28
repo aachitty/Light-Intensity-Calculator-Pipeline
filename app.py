@@ -3,6 +3,7 @@ import math
 import numpy as np
 from scipy import interpolate
 import time  # For adding timestamp to force recalculation
+import sys  # For flush to ensure print statements display immediately
 
 # Page configuration
 st.set_page_config(
@@ -142,11 +143,11 @@ def calculate_light_settings_skypanels60(desired_t_stop, input_iso, input_framer
         Tuple of (distance, intensity_percentage, exposure_warning)
     """
     # Print debug info to help diagnose the issue
-    print(f"Using diffusion type: {diffusion_type}")
+    print(f"Using diffusion type: {diffusion_type}", flush=True)
     
     # Ensure we have a valid diffusion type
     if diffusion_type not in skypanel_data:
-        print(f"Warning: Invalid diffusion type '{diffusion_type}', defaulting to 'Standard'")
+        print(f"Warning: Invalid diffusion type '{diffusion_type}', defaulting to 'Standard'", flush=True)
         diffusion_type = "Standard"
     
     # Reference camera settings (base exposure)
@@ -556,6 +557,17 @@ if calculate_button or has_diffusion_changed or has_color_temp_changed or has_t_
         else:
             calculation_mode_text = "with automatically optimized settings"
         
+        # Print for debug
+        print(f"Calculating with diffusion: {diffusion}", flush=True)
+        
+        # Store input parameters to detect changes BEFORE calculation
+        st.session_state.last_t_stop = t_stop
+        st.session_state.last_iso = iso
+        st.session_state.last_framerate = framerate
+        st.session_state.last_diffusion = diffusion
+        st.session_state.last_color_temp = color_temp
+        st.session_state.last_calc_mode = calc_mode
+        
         # Calculate the light settings
         distance, intensity, exposure_warning = calculate_light_settings_skypanels60(
             t_stop, iso, framerate, diffusion, color_temp, interp_funcs,
@@ -568,13 +580,7 @@ if calculate_button or has_diffusion_changed or has_color_temp_changed or has_t_
         st.session_state.calc_mode = calc_mode
         st.session_state.exposure_warning = exposure_warning
         
-        # Store input parameters to detect changes
-        st.session_state.last_t_stop = t_stop
-        st.session_state.last_iso = iso
-        st.session_state.last_framerate = framerate
-        st.session_state.last_diffusion = diffusion
-        st.session_state.last_color_temp = color_temp
-        st.session_state.last_calc_mode = calc_mode
+        # Remove this duplicate parameter storage block - they're already stored above
         if calc_mode == "Specify Distance":
             st.session_state.last_preferred_distance = preferred_distance
         elif calc_mode == "Specify Intensity":
