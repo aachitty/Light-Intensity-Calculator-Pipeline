@@ -323,6 +323,15 @@ if 'first_load' not in st.session_state:
     st.session_state.preferred_intensity = 70
     st.session_state.t_stop_input_method = "Standard Values"
 
+# Callback functions for diffusion and color temperature changes
+def on_diffusion_change():
+    st.session_state.diffusion_changed = True
+    st.session_state.diffusion = st.session_state.diffusion_type
+    
+def on_color_temp_change():
+    st.session_state.color_temp_changed = True
+    st.session_state.color_temp = st.session_state.color_temp_select
+
 # Create input widgets outside the form to detect changes
 st.subheader("Camera Settings")
 
@@ -389,22 +398,42 @@ col1, col2 = st.columns(2)
 # Add a key with timestamp to force re-render
 timestamp = int(time.time() * 1000)
 
+# Get the index of the last diffusion if it exists
+diffusion_index = 0  # Default to Standard
+if 'last_diffusion' in st.session_state:
+    if st.session_state.last_diffusion == "Standard":
+        diffusion_index = 0
+    elif st.session_state.last_diffusion == "Lite":
+        diffusion_index = 1
+    elif st.session_state.last_diffusion == "Heavy":
+        diffusion_index = 2
+    elif st.session_state.last_diffusion == "Intensifier":
+        diffusion_index = 3
+
+# Get the index of the last color temp if it exists
+color_temp_index = 1  # Default to 5600K
+if 'last_color_temp' in st.session_state:
+    if st.session_state.last_color_temp == "3200K":
+        color_temp_index = 0
+    elif st.session_state.last_color_temp == "5600K":
+        color_temp_index = 1
+
 with col1:
     diffusion = st.selectbox(
         "Diffusion Type",
         options=["Standard", "Lite", "Heavy", "Intensifier"],
-        index=0,  # Default to Standard
+        index=diffusion_index,  # Use remembered value
         help="Different diffusion panels affect light intensity and quality",
-        key=f"diffusion_type_{timestamp}"
+        key="diffusion_type"
     )
 
 with col2:
     color_temp = st.selectbox(
         "Color Temperature",
         options=["3200K", "5600K"],
-        index=1,  # Default to 5600K (daylight)
+        index=color_temp_index,  # Use remembered value
         help="3200K (tungsten) or 5600K (daylight)",
-        key=f"color_temp_select_{timestamp}"
+        key="color_temp_select"
     )
 
 # Calculation Mode Selection
