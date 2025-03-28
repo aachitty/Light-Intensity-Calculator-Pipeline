@@ -118,7 +118,8 @@ def get_distance_for_illuminance(illuminance, diffusion, color_temp, interp_func
     # Ensure minimum distance is 1 meter
     calculated_distance = max(1.0, calculated_distance)
     
-    # At this point, intensity is assumed to be 100% (we haven't adjusted it)
+    # Return the calculated distance and intensity percentage
+    # The intensity percentage will be 100% unless adjusted in the conditions above
     return calculated_distance, 100.0
 
 def calculate_light_settings_skypanels60(desired_t_stop, input_iso, input_framerate, diffusion, color_temp, interp_funcs, 
@@ -309,7 +310,7 @@ except Exception as e:
     st.stop()
 
 # Create a form for user input
-with st.form("light_calculator_form"):
+with st.form("light_calculator_form", clear_on_submit=False):
     st.subheader("Camera Settings")
     
     # Create three columns for input fields
@@ -411,6 +412,9 @@ with st.form("light_calculator_form"):
             step=1,
             help="The calculator will determine the required distance at this intensity"
         )
+    
+    # Add recalculate button to update results even when inputs change
+    st.markdown("**Click Calculate to update results when changing any settings**")
     
     # Submit button
     calculate_button = st.form_submit_button("Calculate Light Settings")
