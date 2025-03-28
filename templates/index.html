@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cinematographer's Light Calculator</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .container {
+            max-width: 800px;
+            margin-top: 30px;
+        }
+        .card {
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .result-card {
+            display: none;
+        }
+        .header-logo {
+            height: 50px;
+            margin-right: 15px;
+        }
+        .warning-box {
+            display: none;
+            margin-top: 20px;
+        }
+        .custom-t-stop-input {
+            display: none;
+        }
+        #loadingSpinner {
+            display: none;
+        }
+        footer {
+            margin-top: 50px;
+            padding: 20px 0;
+            background-color: #f8f9fa;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="d-flex align-items-center mb-4">
+            <img src="https://upload.wikimedia.org/wikipedia/en/thumb/8/8f/Arri_logo.svg/320px-Arri_logo.svg.png" alt="ARRI Logo" class="header-logo">
+            <h1>Cinematographer's Light Calculator</h1>
+        </header>
+        
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Camera Settings</h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="t-stop-selector">T-stop</label>
+                        <select id="t-stop-selector" class="form-select">
+                            <option value="1.4">T-1.4</option>
+                            <option value="2">T-2</option>
+                            <option value="2.8" selected>T-2.8</option>
+                            <option value="4">T-4</option>
+                            <option value="5.6">T-5.6</option>
+                            <option value="8">T-8</option>
+                            <option value="11">T-11</option>
+                            <option value="16">T-16</option>
+                            <option value="22">T-22</option>
+                            <option value="32">T-32</option>
+                            <option value="custom">Custom T-stop</option>
+                        </select>
+                        <div class="custom-t-stop-input mt-2">
+                            <input type="number" id="custom-t-stop" class="form-control" placeholder="Enter custom T-stop" min="0.7" max="45" step="0.1">
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4 mb-3">
+                        <label for="iso-input">ISO</label>
+                        <input type="number" id="iso-input" class="form-control" value="800" min="100" max="12800">
+                    </div>
+                    
+                    <div class="col-md-4 mb-3">
+                        <label for="framerate-input">Framerate (fps)</label>
+                        <input type="number" id="framerate-input" class="form-control" value="24" min="12" max="300">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Light Settings</h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="diffusion-selector">Diffusion Type</label>
+                        <select id="diffusion-selector" class="form-select">
+                            <option value="Standard" selected>Standard</option>
+                            <option value="Lite">Lite</option>
+                            <option value="Heavy">Heavy</option>
+                            <option value="Intensifier">Intensifier</option>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label for="color-temp-selector">Color Temperature</label>
+                        <select id="color-temp-selector" class="form-select">
+                            <option value="3200K">3200K (Tungsten)</option>
+                            <option value="5600K" selected>5600K (Daylight)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Calculation Mode</h4>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="calc-mode" id="auto-calculate" value="Auto Calculate" checked>
+                            <label class="form-check-label" for="auto-calculate">
+                                Auto Calculate
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="calc-mode" id="specify-distance" value="Specify Distance">
+                            <label class="form-check-label" for="specify-distance">
+                                Specify Distance
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="calc-mode" id="specify-intensity" value="Specify Intensity">
+                            <label class="form-check-label" for="specify-intensity">
+                                Specify Intensity
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="distance-input-group" class="mb-3" style="display: none;">
+                    <label for="distance-slider" class="form-label">Distance (meters): <span id="distance-value">3.0</span></label>
+                    <input type="range" class="form-range" id="distance-slider" min="1" max="10" step="0.1" value="3.0">
+                </div>
+                
+                <div id="intensity-input-group" class="mb-3" style="display: none;">
+                    <label for="intensity-slider" class="form-label">Intensity (%): <span id="intensity-value">70</span></label>
+                    <input type="range" class="form-range" id="intensity-slider" min="10" max="100" step="1" value="70">
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <button id="calculate-btn" class="btn btn-primary">
+                        <span id="loadingSpinner" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Calculate Light Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="result-card" class="card result-card">
+            <div class="card-header bg-success text-white">
+                <h4 class="mb-0">Results</h4>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-6 text-center">
+                        <h5>Light Distance</h5>
+                        <h2 id="distance-result">3.0 m</h2>
+                        <p class="text-muted">Distance from subject to light</p>
+                    </div>
+                    <div class="col-md-6 text-center">
+                        <h5>Light Intensity</h5>
+                        <h2 id="intensity-result">70%</h2>
+                        <p class="text-muted">Percentage of maximum output</p>
+                    </div>
+                </div>
+                
+                <div id="underexposure-warning" class="alert alert-warning warning-box">
+                    <h5>Underexposure Warning</h5>
+                    <p>The calculated settings may result in underexposure.</p>
+                    <p>Consider one or more of these solutions:</p>
+                    <ul>
+                        <li>Use a higher ISO setting</li>
+                        <li>Use a wider aperture (lower T-stop)</li>
+                        <li>Use the Intensifier diffusion panel</li>
+                        <li>Add additional lights</li>
+                        <li>Move the light closer to the subject</li>
+                    </ul>
+                </div>
+                
+                <div id="overexposure-warning" class="alert alert-warning warning-box">
+                    <h5>Overexposure Warning</h5>
+                    <p>The calculated settings may result in overexposure.</p>
+                    <p>Consider one or more of these solutions:</p>
+                    <ul>
+                        <li>Use a lower ISO setting</li>
+                        <li>Use a narrower aperture (higher T-stop)</li>
+                        <li>Use the Heavy diffusion panel</li>
+                        <li>Move the light farther from the subject</li>
+                        <li>Use additional diffusion or ND filters</li>
+                    </ul>
+                </div>
+                
+                <div id="too-far-warning" class="alert alert-warning warning-box">
+                    <h5>Practical Range Warning</h5>
+                    <p>The calculated distance exceeds practical range.</p>
+                    <p>The light has been placed at 15 meters (maximum recommended distance), but the intensity may still need to be adjusted for proper exposure. Consider the following solutions:</p>
+                    <ul>
+                        <li>Use a higher ISO setting</li>
+                        <li>Use a wider aperture (lower T-stop)</li>
+                        <li>Use the Intensifier diffusion panel</li>
+                    </ul>
+                </div>
+                
+                <div class="mt-4">
+                    <h5>Interpretation</h5>
+                    <p>
+                        To expose your subject at T-<span id="t-stop-result">2.8</span> with ISO <span id="iso-result">800</span> and <span id="framerate-result">24</span> fps 
+                        using <span id="diffusion-result">Standard</span> diffusion at <span id="color-temp-result">5600K</span> 
+                        <span id="calculation-mode-text">with automatically optimized settings</span>:
+                    </p>
+                    <ol>
+                        <li>Position your ARRI SkyPanel S60-C <strong><span id="distance-result-text">3.0 meters</span></strong> from the subject</li>
+                        <li>Set the light intensity to <strong><span id="intensity-result-text">70%</span></strong> of maximum output</li>
+                    </ol>
+                    <p>These settings will provide proper exposure based on actual photometric data from the ARRI SkyPanel S60-C and the inverse square law.</p>
+                </div>
+                
+                <div class="alert alert-info mt-4">
+                    <h5>Note</h5>
+                    <p>This calculator assumes:</p>
+                    <ul>
+                        <li>180° shutter angle</li>
+                        <li>A single key light setup</li>
+                        <li>Calculations based on measured photometric data from ARRI</li>
+                        <li>Inverse square law for distance interpolation</li>
+                    </ul>
+                    <p class="mb-0">Adjust your final settings based on artistic intent and practical considerations.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <footer class="text-center">
+        <div class="container">
+            <p>© 2023 Cinematographer's Light Calculator | ARRI SkyPanel S60-C Reference Tool</p>
+        </div>
+    </footer>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Show/hide custom T-stop input when "Custom" is selected
+            const tStopSelector = document.getElementById('t-stop-selector');
+            const customTStopInput = document.querySelector('.custom-t-stop-input');
+            
+            tStopSelector.addEventListener('change', function() {
+                if (this.value === 'custom') {
+                    customTStopInput.style.display = 'block';
+                } else {
+                    customTStopInput.style.display = 'none';
+                }
+            });
+            
+            // Show/hide distance and intensity sliders based on calculation mode
+            const calcModeRadios = document.querySelectorAll('input[name="calc-mode"]');
+            const distanceInputGroup = document.getElementById('distance-input-group');
+            const intensityInputGroup = document.getElementById('intensity-input-group');
+            
+            calcModeRadios.forEach(radio => {
+                radio.addEventListener('change', function() {
+                    if (this.value === 'Specify Distance') {
+                        distanceInputGroup.style.display = 'block';
+                        intensityInputGroup.style.display = 'none';
+                    } else if (this.value === 'Specify Intensity') {
+                        distanceInputGroup.style.display = 'none';
+                        intensityInputGroup.style.display = 'block';
+                    } else {
+                        distanceInputGroup.style.display = 'none';
+                        intensityInputGroup.style.display = 'none';
+                    }
+                });
+            });
+            
+            // Update slider value displays
+            const distanceSlider = document.getElementById('distance-slider');
+            const distanceValue = document.getElementById('distance-value');
+            
+            distanceSlider.addEventListener('input', function() {
+                distanceValue.textContent = this.value;
+            });
+            
+            const intensitySlider = document.getElementById('intensity-slider');
+            const intensityValue = document.getElementById('intensity-value');
+            
+            intensitySlider.addEventListener('input', function() {
+                intensityValue.textContent = this.value;
+            });
+            
+            // Calculate button click handler
+            const calculateBtn = document.getElementById('calculate-btn');
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const resultCard = document.getElementById('result-card');
+            
+            calculateBtn.addEventListener('click', async function() {
+                // Show loading spinner
+                loadingSpinner.style.display = 'inline-block';
+                
+                // Get all form values
+                const tStop = tStopSelector.value === 'custom' 
+                    ? document.getElementById('custom-t-stop').value 
+                    : tStopSelector.value;
+                const iso = document.getElementById('iso-input').value;
+                const framerate = document.getElementById('framerate-input').value;
+                const diffusion = document.getElementById('diffusion-selector').value;
+                const colorTemp = document.getElementById('color-temp-selector').value;
+                
+                // Get calculation mode
+                let calcMode = 'Auto Calculate';
+                let preferredDistance = null;
+                let preferredIntensity = null;
+                
+                calcModeRadios.forEach(radio => {
+                    if (radio.checked) {
+                        calcMode = radio.value;
+                    }
+                });
+                
+                if (calcMode === 'Specify Distance') {
+                    preferredDistance = distanceSlider.value;
+                } else if (calcMode === 'Specify Intensity') {
+                    preferredIntensity = intensitySlider.value;
+                }
+                
+                // Prepare data for the API call
+                const requestData = {
+                    t_stop: parseFloat(tStop),
+                    iso: parseInt(iso),
+                    framerate: parseInt(framerate),
+                    diffusion: diffusion,
+                    color_temp: colorTemp,
+                    calc_mode: calcMode
+                };
+                
+                if (preferredDistance !== null) {
+                    requestData.preferred_distance = parseFloat(preferredDistance);
+                }
+                
+                if (preferredIntensity !== null) {
+                    requestData.preferred_intensity = parseFloat(preferredIntensity);
+                }
+                
+                try {
+                    // Make API call to backend
+                    const response = await fetch('/calculate', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(requestData)
+                    });
+                    
+                    const data = await response.json();
+                    
+                    // Update results
+                    document.getElementById('distance-result').textContent = `${data.distance} m`;
+                    document.getElementById('intensity-result').textContent = `${data.intensity}%`;
+                    document.getElementById('distance-result-text').textContent = `${data.distance} meters`;
+                    document.getElementById('intensity-result-text').textContent = `${data.intensity}%`;
+                    
+                    // Update interpretation text
+                    document.getElementById('t-stop-result').textContent = tStop;
+                    document.getElementById('iso-result').textContent = iso;
+                    document.getElementById('framerate-result').textContent = framerate;
+                    document.getElementById('diffusion-result').textContent = diffusion;
+                    document.getElementById('color-temp-result').textContent = colorTemp;
+                    document.getElementById('calculation-mode-text').textContent = data.calculation_mode_text;
+                    
+                    // Show/hide warnings
+                    document.getElementById('underexposure-warning').style.display = data.exposure_warning === 'insufficient_light' ? 'block' : 'none';
+                    document.getElementById('overexposure-warning').style.display = data.exposure_warning === 'too_much_light' ? 'block' : 'none';
+                    document.getElementById('too-far-warning').style.display = data.exposure_warning === 'too_far' ? 'block' : 'none';
+                    
+                    // Show result card
+                    resultCard.style.display = 'block';
+                    
+                    // Scroll to result
+                    resultCard.scrollIntoView({ behavior: 'smooth' });
+                } catch (error) {
+                    console.error('Error calculating light settings:', error);
+                    alert('An error occurred during calculation. Please check your inputs and try again.');
+                } finally {
+                    // Hide loading spinner
+                    loadingSpinner.style.display = 'none';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
