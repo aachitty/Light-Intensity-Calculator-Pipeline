@@ -3,18 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cinematographer's Light Calculator</title>
+    <title>Haplon Light Intensity Calculator</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        /* Streamlit-like theme */
+        /* Haplon dark theme */
         :root {
-            --primary-color: #4059AD;
+            --primary-color: #F7C35F; /* Haplon gold/yellow */
             --secondary-color: #6B9AC4;
-            --background-color: #f7f7f7;
-            --card-bg-color: #ffffff;
-            --text-color: #2e2e2e;
+            --background-color: #2a2a2a; /* Dark gray background */
+            --card-bg-color: #333333; /* Slightly lighter gray for cards */
+            --text-color: #ffffff; /* White text */
             --accent-color: #FF4B4B;
-            --success-color: #0CCE6B;
+            --success-color: #F7C35F; /* Haplon gold for success */
+            --card-header-bg: #222222; /* Darker gray for card headers */
+            --card-border-color: #444444;
         }
         
         body {
@@ -31,37 +33,65 @@
         .card {
             margin-bottom: 20px;
             border-radius: 0.5rem;
-            border: none;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border: 1px solid var(--card-border-color);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
             background-color: var(--card-bg-color);
+            color: var(--text-color);
         }
         
         .card-header {
             border-radius: 0.5rem 0.5rem 0 0 !important;
             font-weight: 600;
+            background-color: var(--card-header-bg) !important;
+            border-bottom: 1px solid var(--card-border-color);
+        }
+        
+        .card-body {
+            color: var(--text-color);
         }
         
         .bg-primary {
-            background-color: var(--primary-color) !important;
+            background-color: var(--card-header-bg) !important;
+            color: var(--primary-color) !important;
+            border-bottom: 2px solid var(--primary-color);
         }
         
         .bg-success {
-            background-color: var(--success-color) !important;
+            background-color: var(--card-header-bg) !important;
+            color: var(--primary-color) !important;
+            border-bottom: 2px solid var(--primary-color);
         }
         
         .btn-primary {
             background-color: var(--primary-color);
             border-color: var(--primary-color);
+            color: #2a2a2a;
+            font-weight: 600;
         }
         
         .btn-primary:hover {
-            background-color: #344e9a;
-            border-color: #344e9a;
+            background-color: #e0b14c;
+            border-color: #e0b14c;
+            color: #222222;
         }
         
         .form-control, .form-select {
             border-radius: 0.3rem;
-            border: 1px solid #ced4da;
+            border: 1px solid #555555;
+            background-color: #444444;
+            color: #ffffff;
+        }
+        
+        .form-control:focus, .form-select:focus {
+            background-color: #4a4a4a;
+            color: #ffffff;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.25rem rgba(247, 195, 95, 0.25);
+        }
+        
+        .form-check-input:checked {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
         }
         
         .form-range::-webkit-slider-thumb {
@@ -69,13 +99,15 @@
         }
         
         .alert-warning {
-            background-color: #fff3cd;
-            border-color: #ffeeba;
+            background-color: #3d3522;
+            border-color: #5e502f;
+            color: #f0d78b;
         }
         
         .alert-info {
-            background-color: #d1ecf1;
-            border-color: #bee5eb;
+            background-color: #222d33;
+            border-color: #2f3e46;
+            color: #90b8c9;
         }
         
         .header-logo {
@@ -103,14 +135,20 @@
         
         h1, h2, h3, h4, h5, h6 {
             font-weight: 600;
+            color: var(--text-color);
+        }
+        
+        .text-muted {
+            color: #aaaaaa !important;
         }
         
         footer {
             margin-top: 50px;
             padding: 20px 0;
-            background-color: #f0f2f6;
+            background-color: #222222;
             font-size: 0.9rem;
-            border-top: 1px solid #e6e9ef;
+            border-top: 1px solid #333333;
+            color: #aaaaaa;
         }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&display=swap" rel="stylesheet">
@@ -118,8 +156,8 @@
 <body>
     <div class="container">
         <header class="d-flex align-items-center mb-4">
-            <img src="https://upload.wikimedia.org/wikipedia/en/thumb/8/8f/Arri_logo.svg/320px-Arri_logo.svg.png" alt="ARRI Logo" class="header-logo">
-            <h1>Cinematographer's Light Calculator</h1>
+            <img src="/static/haplon_logo.png" alt="Haplon Logo" class="header-logo">
+            <h1>Haplon Light Intensity Calculator</h1>
         </header>
         
         <div class="card">
@@ -298,22 +336,10 @@
                         <span id="calculation-mode-text">with automatically optimized settings</span>:
                     </p>
                     <ol>
-                        <li>Position your ARRI SkyPanel S60-C <strong><span id="distance-result-text">3.0 meters</span></strong> from the subject</li>
+                        <li>Position your Haplon light <strong><span id="distance-result-text">3.0 meters</span></strong> from the subject</li>
                         <li>Set the light intensity to <strong><span id="intensity-result-text">70%</span></strong> of maximum output</li>
                     </ol>
-                    <p>These settings will provide proper exposure based on actual photometric data from the ARRI SkyPanel S60-C and the inverse square law.</p>
-                </div>
-                
-                <div class="alert alert-info mt-4">
-                    <h5>Note</h5>
-                    <p>This calculator assumes:</p>
-                    <ul>
-                        <li>180° shutter angle</li>
-                        <li>A single key light setup</li>
-                        <li>Calculations based on measured photometric data from ARRI</li>
-                        <li>Inverse square law for distance interpolation</li>
-                    </ul>
-                    <p class="mb-0">Adjust your final settings based on artistic intent and practical considerations.</p>
+                    <p>These settings will provide proper exposure based on precise photometric data and the inverse square law.</p>
                 </div>
             </div>
         </div>
@@ -321,7 +347,7 @@
     
     <footer class="text-center">
         <div class="container">
-            <p>© 2023 Cinematographer's Light Calculator | ARRI SkyPanel S60-C Reference Tool</p>
+            <p>© 2023 Haplon Light Intensity Calculator | Professional Lighting Tool</p>
         </div>
     </footer>
     
