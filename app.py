@@ -123,7 +123,7 @@ def get_distance_for_illuminance(illuminance, diffusion, color_temp, interp_func
     # The intensity percentage will be 100% unless adjusted in the conditions above
     return calculated_distance, 100.0
 
-def calculate_light_settings_skypanels60(desired_t_stop, input_iso, input_framerate, diffusion, color_temp, interp_funcs, 
+def calculate_light_settings_skypanels60(desired_t_stop, input_iso, input_framerate, diffusion_type, color_temp, interp_funcs, 
                                  preferred_distance=None, preferred_intensity=None):
     """
     Calculate light settings based on camera parameters and preferred constraints.
@@ -132,7 +132,7 @@ def calculate_light_settings_skypanels60(desired_t_stop, input_iso, input_framer
         desired_t_stop: The T-stop setting on the camera
         input_iso: The ISO setting on the camera
         input_framerate: The framerate setting on the camera
-        diffusion: The type of diffusion used on the light
+        diffusion_type: The type of diffusion used on the light
         color_temp: The color temperature of the light
         interp_funcs: Interpolation functions for the light data
         preferred_distance: If specified, calculate intensity at this distance
@@ -141,6 +141,14 @@ def calculate_light_settings_skypanels60(desired_t_stop, input_iso, input_framer
     Returns:
         Tuple of (distance, intensity_percentage, exposure_warning)
     """
+    # Print debug info to help diagnose the issue
+    print(f"Using diffusion type: {diffusion_type}")
+    
+    # Ensure we have a valid diffusion type
+    if diffusion_type not in skypanel_data:
+        print(f"Warning: Invalid diffusion type '{diffusion_type}', defaulting to 'Standard'")
+        diffusion_type = "Standard"
+    
     # Reference camera settings (base exposure)
     REFERENCE_T_STOP = 4.0      # A common middle T-stop
     REFERENCE_ISO = 800         # Standard cinema camera ISO
@@ -153,26 +161,6 @@ def calculate_light_settings_skypanels60(desired_t_stop, input_iso, input_framer
     reference_exposure_time = (1/REFERENCE_FRAMERATE) * (180/360)
     
     # Using the formula FC = (25 * f²) / (exp * ISO)
-    # Where:
-    # - FC is foot-candles (illuminance)
-    # - f is the f-stop number (T-stop in our case)
-    # - exp is the exposure time in seconds
-    # - ISO is the ISO sensitivity
-    #
-    # For our calculation, we need to determine the ratio between our settings and reference settings
-    # to adjust the illuminance required
-    
-    # For reference settings, FC_ref = (25 * REFERENCE_T_STOP²) / (reference_exp_time * REFERENCE_ISO)
-    # For input settings, FC_input = (25 * desired_t_stop²) / (exposure_time * input_ISO)
-    
-    # The ratio FC_input / FC_ref gives us our adjustment factor using the formula:
-    # FC = (25 * f²) / (exp * ISO)
-    # 
-    # If we have two different camera settings, then:
-    # FC_input / FC_ref = ((25 * desired_t_stop²) / (exposure_time * input_ISO)) / ((25 * REFERENCE_T_STOP²) / (reference_exposure_time * REFERENCE_ISO))
-    # 
-    # Simplifying:
-    # FC_input / FC_ref = (desired_t_stop² * reference_exposure_time * REFERENCE_ISO) / (REFERENCE_T_STOP² * exposure_time * input_ISO)
     illuminance_factor = (
         (desired_t_stop**2 * reference_exposure_time * REFERENCE_ISO) /
         (REFERENCE_T_STOP**2 * exposure_time * input_iso)
@@ -180,13 +168,12 @@ def calculate_light_settings_skypanels60(desired_t_stop, input_iso, input_framer
     
     # Get the reference illuminance at 3 meters (a middle value from our data)
     reference_distance = 3.0
-    reference_illuminance = skypanel_data[diffusion][int(reference_distance)][color_temp]
+    reference_illuminance = skypanel_data[diffusion_type][int(reference_distance)][color_temp]
     
     # Convert lux to foot-candles (1 lux = 0.0929 fc)
     reference_fc = reference_illuminance * 0.0929
     
-    # Calculate required illuminance based on the formula FC = (25 * f²) / (exp * ISO)
-    # We use illuminance_factor to adjust our reference value
+    # Calculate required illuminance
     required_fc = reference_fc * illuminance_factor
     
     # Convert back to lux for our calculations (1 fc = 10.764 lux)
@@ -195,113 +182,139 @@ def calculate_light_settings_skypanels60(desired_t_stop, input_iso, input_framer
     # Initialize exposure warning flag
     exposure_warning = None
     
-    # Determine the max illuminance possible at the closest distance (typically 3m) with max intensity
-    distances = np.array(list(skypanel_data[diffusion].keys()))
-    illuminances = np.array([skypanel_data[diffusion][d][color_temp] for d in distances])
-    min_distance = min(distances)
-    max_illuminance_at_min_distance = skypanel_data[diffusion][int(min_distance)][color_temp]
+    # Get all distance and illuminance data for this diffusion and color temp
+    distances = list(skypanel_data[diffusion_type].keys())
+    distances.sort()  # Ensure distances are in ascending order
+    illuminances = [skypanel_data[diffusion_type][d][color_temp] for d in distances]
     
-    # If preferred_distance is specified, calculate intensity at that distance
+    min_distance = min(distances)
+    max_distance = max(distances)
+    min_illuminance = min(illuminances)
+    max_illuminance = max(illuminances)
+    
+    # ---------------------------------------------------------------------------
+    # Mode 1: Preferred Distance specified - calculate intensity at that distance
+    # ---------------------------------------------------------------------------
     if preferred_distance is not None:
-        # Find closest reference point
-        idx = np.abs(distances - preferred_distance).argmin()
-        ref_distance = distances[idx]
-        ref_illuminance = illuminances[idx]
-        
-        # Calculate illuminance at preferred distance based on inverse square law from reference point
-        illuminance_at_preferred = ref_illuminance * (ref_distance / preferred_distance) ** 2
-        
-        # Maximum possible illuminance at the preferred distance with 100% intensity
-        max_illuminance_at_preferred = illuminance_at_preferred
-        
-        # Calculate required intensity percentage to get required_illuminance at preferred_distance
-        intensity_percentage = (required_illuminance / max_illuminance_at_preferred) * 100
-        
-        # Check if we're in a difficult exposure situation - use more reasonable thresholds
-        if intensity_percentage > 90:
-            # Only warn if we're very close to maxing out the intensity
-            if intensity_percentage > 100:
-                exposure_warning = "insufficient_light"
-                intensity_percentage = 100.0  # Cap at 100%
-        elif intensity_percentage < 15:
-            exposure_warning = "too_much_light"
-            intensity_percentage = max(10.0, intensity_percentage)  # Ensure minimum
+        # Check if distance is within our data range
+        if preferred_distance < min_distance:
+            # Extrapolate using inverse square law from closest measurement
+            ref_illuminance = skypanel_data[diffusion_type][min_distance][color_temp]
+            illuminance_at_preferred = ref_illuminance * (min_distance / preferred_distance) ** 2
+        elif preferred_distance > max_distance:
+            # Extrapolate using inverse square law from farthest measurement
+            ref_illuminance = skypanel_data[diffusion_type][max_distance][color_temp]
+            illuminance_at_preferred = ref_illuminance * (max_distance / preferred_distance) ** 2
+        else:
+            # Find the two closest distances in our data
+            lower_distance = max([d for d in distances if d <= preferred_distance])
+            upper_distance = min([d for d in distances if d >= preferred_distance])
             
+            # If we've found an exact match
+            if lower_distance == upper_distance:
+                illuminance_at_preferred = skypanel_data[diffusion_type][lower_distance][color_temp]
+            else:
+                # Linear interpolation between the two closest points
+                lower_illuminance = skypanel_data[diffusion_type][lower_distance][color_temp]
+                upper_illuminance = skypanel_data[diffusion_type][upper_distance][color_temp]
+                
+                # Calculate the interpolation factor
+                alpha = (preferred_distance - lower_distance) / (upper_distance - lower_distance)
+                
+                # Linear interpolation
+                illuminance_at_preferred = lower_illuminance + alpha * (upper_illuminance - lower_illuminance)
+        
+        # Calculate required intensity percentage
+        intensity_percentage = (required_illuminance / illuminance_at_preferred) * 100
+        
+        # Check exposure conditions
+        if intensity_percentage > 100:
+            exposure_warning = "insufficient_light"
+            intensity_percentage = 100.0  # Cap at maximum
+        elif intensity_percentage < 10:
+            exposure_warning = "too_much_light"
+            intensity_percentage = 10.0  # Enforce minimum
+        
         return preferred_distance, round(intensity_percentage, 1), exposure_warning
     
-    # If preferred_intensity is specified, calculate distance at that intensity
+    # ---------------------------------------------------------------------------
+    # Mode 2: Preferred Intensity specified - calculate distance for that intensity
+    # ---------------------------------------------------------------------------
     elif preferred_intensity is not None:
-        # Get the reference illuminance at the closest distance (typically 3m)
-        ref_distance = min(distances)
-        ref_illuminance = skypanel_data[diffusion][int(ref_distance)][color_temp]
+        # Get max illuminance at closest distance with full intensity
+        max_illuminance_at_min_distance = skypanel_data[diffusion_type][min_distance][color_temp]
         
-        # Calculate what illuminance we can achieve at preferred intensity at reference distance
-        achievable_illuminance = (preferred_intensity / 100) * ref_illuminance
+        # Adjust for the preferred intensity
+        achievable_illuminance = (preferred_intensity / 100) * max_illuminance_at_min_distance
         
-        # Calculate the distance needed to get required_illuminance with achievable_illuminance
-        if achievable_illuminance < required_illuminance:
-            # If we can't achieve required illuminance, get as close as possible
-            ratio = achievable_illuminance / required_illuminance
-            
-            # If the ratio is close, we can probably achieve proper exposure
-            if ratio > 0.7:  # Within 70% of required illuminance
-                distance = 1.0  # Closest possible distance
-                exposure_warning = None  # No warning needed, we're close enough
-            else:
-                # Can't achieve required illuminance at the preferred intensity
-                exposure_warning = "insufficient_light"
-                distance = 1.0  # Closest possible distance
-        else:
-            # We can achieve required illuminance - calculate ideal distance
-            distance = ref_distance * math.sqrt(achievable_illuminance / required_illuminance)
-            
-            # Check if distance is too far (beyond practical range)
-            if distance > 15.0:
-                exposure_warning = "too_far"
-                distance = 15.0  # Cap at maximum practical distance
-        
-        # Ensure minimum distance of 1 meter
-        distance = max(1.0, distance)
-        
-        return round(distance, 2), preferred_intensity, exposure_warning
-    
-    # Auto calculation mode
-    else:
-        # First check if the max possible illuminance at closest distance is enough
-        max_possible_illuminance = max_illuminance_at_min_distance
-        
-        if required_illuminance > max_possible_illuminance * 1.1:  # Need 10% more than possible
-            # Even at closest distance and full intensity, we can't get enough light
+        # If we cannot achieve the required illuminance even at the closest distance
+        if achievable_illuminance < required_illuminance and preferred_intensity >= 99:
             exposure_warning = "insufficient_light"
-            return 1.0, 100.0, exposure_warning
-            
-        # Get ideal distance for the required illuminance
-        ideal_distance, intensity_percentage = get_distance_for_illuminance(
-            required_illuminance, diffusion, color_temp, interp_funcs
-        )
+            return min_distance, 100.0, exposure_warning
         
-        # Check exposure conditions with more reasonable thresholds
+        # Calculate the ideal distance using inverse square law
+        # If distance₁ gives illuminance₁, then distance₂ for illuminance₂ is:
+        # distance₂ = distance₁ * sqrt(illuminance₁ / illuminance₂)
+        ideal_distance = min_distance * math.sqrt(achievable_illuminance / required_illuminance)
+        
+        # Check if distance is too far
         if ideal_distance > 15.0:
             exposure_warning = "too_far"
             ideal_distance = 15.0  # Cap at maximum practical distance
-        elif ideal_distance < 1.5 and intensity_percentage > 95:
-            # Only warn if we're very close and need near max intensity
-            exposure_warning = "insufficient_light"
-        elif ideal_distance > 8.0 and intensity_percentage < 20:
-            exposure_warning = "too_much_light"
         
-        # Adjust distance and intensity to keep within practical ranges
-        # Minimum distance is 1 meter
+        # Ensure minimum distance of 1 meter
         ideal_distance = max(1.0, ideal_distance)
         
-        # Clamp intensity between 10% and 100%
-        intensity_percentage = min(100.0, max(10.0, intensity_percentage))
+        return round(ideal_distance, 2), preferred_intensity, exposure_warning
+    
+    # ---------------------------------------------------------------------------
+    # Mode 3: Auto calculation - find best distance and intensity combination
+    # ---------------------------------------------------------------------------
+    else:
+        # Get max illuminance at closest distance with full intensity
+        max_illuminance_at_min_distance = skypanel_data[diffusion_type][min_distance][color_temp]
         
-        # Round values for clarity
-        ideal_distance = round(ideal_distance, 2)
-        intensity_percentage = round(intensity_percentage, 1)
+        # If we cannot achieve the required illuminance even at the closest distance
+        if required_illuminance > max_illuminance_at_min_distance:
+            exposure_warning = "insufficient_light"
+            return min_distance, 100.0, exposure_warning
         
-        return ideal_distance, intensity_percentage, exposure_warning
+        # Get ideal distance for 100% intensity
+        ideal_distance = min_distance * math.sqrt(max_illuminance_at_min_distance / required_illuminance)
+        
+        # Check if distance is practical
+        if ideal_distance > 15.0:
+            # Distance is too far, cap it and adjust intensity
+            ideal_distance = 15.0
+            exposure_warning = "too_far"
+            
+            # Calculate required intensity at this capped distance
+            illuminance_at_distance = max_illuminance_at_min_distance * (min_distance / ideal_distance) ** 2
+            intensity_percentage = (required_illuminance / illuminance_at_distance) * 100
+        else:
+            # Distance is practical, use 100% intensity
+            intensity_percentage = 100.0
+            
+            # Check if we can reduce intensity (to allow for future increases if needed)
+            if ideal_distance < 3.0:
+                # We're close enough that we can probably reduce intensity
+                # Calculate the ideal intensity at 3.0 meters
+                illuminance_at_3m = max_illuminance_at_min_distance * (min_distance / 3.0) ** 2
+                reduced_intensity = (required_illuminance / illuminance_at_3m) * 100
+                
+                # If we can use a reasonable intensity at 3.0 meters, do so
+                if 20 <= reduced_intensity <= 80:
+                    ideal_distance = 3.0
+                    intensity_percentage = reduced_intensity
+                    
+                    # No warning needed, this is a good balance
+                    exposure_warning = None
+        
+        # Ensure values are in practical ranges
+        ideal_distance = max(1.0, ideal_distance)
+        intensity_percentage = max(10.0, min(100.0, intensity_percentage))
+        
+        return round(ideal_distance, 2), round(intensity_percentage, 1), exposure_warning
 
 # Create the interpolation functions
 try:
