@@ -440,8 +440,8 @@
                         
                         <div class="row mb-3">
                             <div class="col-md-8">
-                                <div class="visualizer-container bg-dark rounded p-2 mb-3">
-                                    <canvas id="lighting-canvas" class="w-100 rounded" style="background-color: #222222;"></canvas>
+                                <div class="visualizer-container bg-dark rounded p-2 mb-3" style="width: 100%; height: 500px; border: 1px solid #444;">
+                                    <canvas id="lighting-canvas" class="w-100 h-100 rounded" style="background-color: #222222; display: block;"></canvas>
                                 </div>
                             </div>
                             <div class="col-md-4">
@@ -489,7 +489,7 @@
     
     <footer class="text-center">
         <div class="container">
-            <p>© 2024 Haplon Light Intensity Calculator | Professional Lighting Tool</p>
+            <p>© 2025 Haplon Light Intensity Calculator | Professional Lighting Tool</p>
         </div>
     </footer>
     
@@ -648,30 +648,81 @@
                 }
             });
             
-            // Initialize tabs functionality
-            const triggerTabList = document.querySelectorAll('#calculatorTabs button')
-            triggerTabList.forEach(triggerEl => {
-                const tabTrigger = new bootstrap.Tab(triggerEl)
-                
-                triggerEl.addEventListener('click', event => {
-                    event.preventDefault()
-                    tabTrigger.show()
+            // Initialize tabs functionality with Bootstrap 5
+            document.querySelectorAll('#calculatorTabs button').forEach(button => {
+                button.addEventListener('click', function(event) {
+                    event.preventDefault();
+                    
+                    // Get the target tab id
+                    const targetTab = this.getAttribute('data-bs-target');
+                    
+                    // Hide all tab panes
+                    document.querySelectorAll('.tab-pane').forEach(pane => {
+                        pane.classList.remove('show', 'active');
+                    });
+                    
+                    // Show the targeted tab pane
+                    document.querySelector(targetTab).classList.add('show', 'active');
+                    
+                    // Update active state on tab buttons
+                    document.querySelectorAll('#calculatorTabs .nav-link').forEach(link => {
+                        link.classList.remove('active');
+                        link.setAttribute('aria-selected', 'false');
+                    });
+                    
+                    // Set the clicked tab as active
+                    this.classList.add('active');
+                    this.setAttribute('aria-selected', 'true');
                     
                     // Initialize visualizer when switching to visualizer tab
-                    if (event.target.id === 'visualizer-tab' && typeof initVisualizer === 'function') {
+                    if (this.id === 'visualizer-tab' && typeof initVisualizer === 'function') {
+                        console.log('Initializing visualizer');
                         setTimeout(() => {
                             initVisualizer(modifiersByModel);
                         }, 100);
                     }
-                })
+                });
             });
+            
+            // Initialize visualizer if we start on the visualizer tab
+            if (document.querySelector('#visualizer-tab').classList.contains('active') && 
+                typeof initVisualizer === 'function') {
+                console.log('Initializing visualizer on page load');
+                setTimeout(() => {
+                    initVisualizer(modifiersByModel);
+                }, 500);
+            }
         });
     </script>
     
     <!-- Bootstrap Bundle with Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
     
-    <!-- 2D Visualizer Script -->
-    <script src="/static/js/2d-visualizer.js"></script>
+    <!-- Wait for Bootstrap to load, then initialize the 2D Visualizer -->
+    <script>
+        // Make sure Bootstrap is loaded before loading our visualizer
+        window.addEventListener('load', function() {
+            console.log('Window loaded, loading visualizer script');
+            
+            // Dynamically load 2D Visualizer Script
+            const script = document.createElement('script');
+            script.src = '/static/js/2d-visualizer.js';
+            script.onload = function() {
+                console.log('Visualizer script loaded');
+                // Check if we're on the visualizer tab
+                if (document.querySelector('#visualizer-tab').classList.contains('active')) {
+                    console.log('On visualizer tab, initializing');
+                    setTimeout(() => {
+                        if (typeof initVisualizer === 'function') {
+                            initVisualizer(modifiersByModel);
+                        } else {
+                            console.error('initVisualizer function not found');
+                        }
+                    }, 200);
+                }
+            };
+            document.body.appendChild(script);
+        });
+    </script>
 </body>
 </html>

@@ -10,10 +10,22 @@
 class LightingVisualizer {
     constructor(canvasId, width, height, lightData) {
         this.canvas = document.getElementById(canvasId);
+        if (!this.canvas) {
+            console.error(`Canvas element with id ${canvasId} not found`);
+            return;
+        }
+        
+        // Set canvas size directly with attributes
+        this.canvas.setAttribute('width', width || 800);
+        this.canvas.setAttribute('height', height || 500);
+        
         this.ctx = this.canvas.getContext('2d');
-        this.canvas.width = width || 800;
-        this.canvas.height = height || 600;
+        this.canvas.style.width = '100%';
+        this.canvas.style.height = '100%';
+        this.canvas.style.display = 'block';
         this.lightData = lightData;
+        
+        console.log(`Canvas initialized with size: ${this.canvas.width}x${this.canvas.height}`);
         
         this.lights = [];
         this.selectedLight = null;
@@ -433,16 +445,36 @@ class LightingVisualizer {
 
 // Function to initialize the visualizer (called when visualizer tab is shown)
 function initVisualizer(lightData) {
-    // Only initialize once
-    if (window.visualizer) return;
+    console.log('initVisualizer called with lightData:', lightData);
+    
+    // Clear any existing visualizer
+    if (window.visualizer) {
+        console.log('Clearing existing visualizer');
+        window.visualizer = null;
+    }
     
     // Get canvas container dimensions
     const container = document.querySelector('.visualizer-container');
+    if (!container) {
+        console.error('Cannot find visualizer container element');
+        return;
+    }
+    
+    const canvas = document.getElementById('lighting-canvas');
+    if (!canvas) {
+        console.error('Cannot find lighting-canvas element');
+        return;
+    }
+    
+    // Set dimensions
     const width = container.clientWidth - 20; // Accounting for padding
     const height = Math.min(500, width * 0.75); // Maintain aspect ratio
     
+    console.log(`Canvas dimensions: ${width}x${height}`);
+    
     // Create the visualizer
     window.visualizer = new LightingVisualizer('lighting-canvas', width, height, lightData);
+    console.log('Visualizer initialized');
 }
 
 // Function to update a light in the visualizer from calculator results
