@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Haplon Light Intensity Calculator</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         /* Haplon dark theme */
         :root {
@@ -160,9 +159,6 @@
             <img src="/static/haplon_logo.png" alt="Haplon Logo" class="header-logo">
             <h1>Haplon Light Intensity Calculator</h1>
         </header>
-        
-        <!-- Main content -->
-        <div id="calculator-content">
         
         <div class="card">
             <div class="card-header bg-primary text-white">
@@ -409,20 +405,21 @@
                 </div>
             </div>
         </div>
-        </div>
     </div>
     
     <footer class="text-center">
         <div class="container">
-            <p>&copy; 2025 Haplon Light Intensity Calculator | Professional Lighting Tool</p>
+            <p>© 2024 Haplon Light Intensity Calculator | Professional Lighting Tool</p>
         </div>
     </footer>
-
+    
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Show/hide custom T-stop input based on selection
-            document.getElementById('t-stop-selector').addEventListener('change', function() {
-                const customTStopInput = document.querySelector('.custom-t-stop-input');
+            // Show/hide custom T-stop input when "Custom" is selected
+            const tStopSelector = document.getElementById('t-stop-selector');
+            const customTStopInput = document.querySelector('.custom-t-stop-input');
+            
+            tStopSelector.addEventListener('change', function() {
                 if (this.value === 'custom') {
                     customTStopInput.style.display = 'block';
                 } else {
@@ -430,26 +427,17 @@
                 }
             });
             
-            // Update distance slider value display
-            document.getElementById('distance-slider').addEventListener('input', function() {
-                document.getElementById('distance-value').textContent = this.value;
-            });
+            // Show/hide distance and intensity sliders based on calculation mode
+            const calcModeRadios = document.querySelectorAll('input[name="calc-mode"]');
+            const distanceInputGroup = document.getElementById('distance-input-group');
+            const intensityInputGroup = document.getElementById('intensity-input-group');
             
-            // Update intensity slider value display
-            document.getElementById('intensity-slider').addEventListener('input', function() {
-                document.getElementById('intensity-value').textContent = this.value;
-            });
-            
-            // Show/hide appropriate input group based on calculation mode
-            document.querySelectorAll('input[name="calc-mode"]').forEach(function(radio) {
+            calcModeRadios.forEach(radio => {
                 radio.addEventListener('change', function() {
-                    const distanceInputGroup = document.getElementById('distance-input-group');
-                    const intensityInputGroup = document.getElementById('intensity-input-group');
-                    
-                    if (this.id === 'specify-distance') {
+                    if (this.value === 'Specify Distance') {
                         distanceInputGroup.style.display = 'block';
                         intensityInputGroup.style.display = 'none';
-                    } else if (this.id === 'specify-intensity') {
+                    } else if (this.value === 'Specify Intensity') {
                         distanceInputGroup.style.display = 'none';
                         intensityInputGroup.style.display = 'block';
                     } else {
@@ -459,106 +447,122 @@
                 });
             });
             
-            // Handle calculate button click
-            document.getElementById('calculate-btn').addEventListener('click', function() {
+            // Update slider value displays
+            const distanceSlider = document.getElementById('distance-slider');
+            const distanceValue = document.getElementById('distance-value');
+            
+            distanceSlider.addEventListener('input', function() {
+                distanceValue.textContent = this.value;
+            });
+            
+            const intensitySlider = document.getElementById('intensity-slider');
+            const intensityValue = document.getElementById('intensity-value');
+            
+            intensitySlider.addEventListener('input', function() {
+                intensityValue.textContent = this.value;
+            });
+            
+            // Calculate button click handler
+            const calculateBtn = document.getElementById('calculate-btn');
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const resultCard = document.getElementById('result-card');
+            
+            calculateBtn.addEventListener('click', async function() {
                 // Show loading spinner
-                document.getElementById('loadingSpinner').style.display = 'inline-block';
+                loadingSpinner.style.display = 'inline-block';
                 
-                // Get form values
-                let tStop;
-                if (document.getElementById('t-stop-selector').value === 'custom') {
-                    tStop = document.getElementById('custom-t-stop').value;
-                } else {
-                    tStop = document.getElementById('t-stop-selector').value;
-                }
-                
+                // Get all form values
+                const tStop = tStopSelector.value === 'custom' 
+                    ? document.getElementById('custom-t-stop').value 
+                    : tStopSelector.value;
                 const iso = document.getElementById('iso-input').value;
                 const framerate = document.getElementById('framerate-input').value;
                 const lightModel = document.getElementById('light-model-selector').value;
                 const modifierType = document.getElementById('modifier-selector').value;
                 const colorTemp = document.getElementById('color-temp-selector').value;
                 
-                // Get calculation mode and related values
-                let calcMode = document.querySelector('input[name="calc-mode"]:checked').id;
+                // Get calculation mode
+                let calcMode = 'Auto Calculate';
                 let preferredDistance = null;
                 let preferredIntensity = null;
                 
-                if (calcMode === 'specify-distance') {
-                    preferredDistance = document.getElementById('distance-slider').value;
-                } else if (calcMode === 'specify-intensity') {
-                    preferredIntensity = document.getElementById('intensity-slider').value;
+                calcModeRadios.forEach(radio => {
+                    if (radio.checked) {
+                        calcMode = radio.value;
+                    }
+                });
+                
+                if (calcMode === 'Specify Distance') {
+                    preferredDistance = distanceSlider.value;
+                } else if (calcMode === 'Specify Intensity') {
+                    preferredIntensity = intensitySlider.value;
                 }
                 
-                // Prepare data for AJAX request
-                const data = {
-                    t_stop: tStop,
-                    iso: iso,
-                    framerate: framerate,
+                // Prepare data for the API call
+                const requestData = {
+                    t_stop: parseFloat(tStop),
+                    iso: parseInt(iso),
+                    framerate: parseInt(framerate),
                     light_model: lightModel,
                     modifier_type: modifierType,
                     color_temp: colorTemp,
-                    calculation_mode: calcMode,
-                    preferred_distance: preferredDistance,
-                    preferred_intensity: preferredIntensity
+                    calc_mode: calcMode
                 };
                 
-                // Make AJAX request
-                fetch('/calculate', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(data)
-                })
-                .then(response => response.json())
-                .then(data => {
-                    // Hide loading spinner
-                    document.getElementById('loadingSpinner').style.display = 'none';
+                if (preferredDistance !== null) {
+                    requestData.preferred_distance = parseFloat(preferredDistance);
+                }
+                
+                if (preferredIntensity !== null) {
+                    requestData.preferred_intensity = parseFloat(preferredIntensity);
+                }
+                
+                try {
+                    // Make API call to backend
+                    const response = await fetch('/calculate', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(requestData)
+                    });
                     
-                    // Show results card
-                    document.getElementById('result-card').style.display = 'block';
+                    const data = await response.json();
                     
-                    // Update result values
-                    document.getElementById('distance-result').textContent = data.distance.toFixed(1) + ' m';
-                    document.getElementById('intensity-result').textContent = data.intensity.toFixed(1) + '%';
+                    // Update results
+                    document.getElementById('distance-result').textContent = `${data.distance} m`;
+                    document.getElementById('intensity-result').textContent = `${data.intensity}%`;
+                    document.getElementById('distance-result-text').textContent = `${data.distance} meters`;
+                    document.getElementById('intensity-result-text').textContent = `${data.intensity}%`;
                     
-                    // Update interpretation section
+                    // Update interpretation text
                     document.getElementById('t-stop-result').textContent = tStop;
                     document.getElementById('iso-result').textContent = iso;
                     document.getElementById('framerate-result').textContent = framerate;
+                    document.getElementById('light-model-result').textContent = lightModel;
                     document.getElementById('diffusion-result').textContent = modifierType;
                     document.getElementById('color-temp-result').textContent = colorTemp;
-                    document.getElementById('light-model-result').textContent = lightModel;
-                    document.getElementById('distance-result-text').textContent = data.distance.toFixed(1) + ' meters';
-                    document.getElementById('intensity-result-text').textContent = data.intensity.toFixed(1) + '%';
                     document.getElementById('calculation-mode-text').textContent = data.calculation_mode_text;
                     
-                    // Show/hide appropriate warnings
-                    document.getElementById('underexposure-warning').style.display = 'none';
-                    document.getElementById('overexposure-warning').style.display = 'none';
-                    document.getElementById('too-far-warning').style.display = 'none';
+                    // Show/hide warnings
+                    document.getElementById('underexposure-warning').style.display = data.exposure_warning === 'insufficient_light' ? 'block' : 'none';
+                    document.getElementById('overexposure-warning').style.display = data.exposure_warning === 'too_much_light' ? 'block' : 'none';
+                    document.getElementById('too-far-warning').style.display = data.exposure_warning === 'too_far' ? 'block' : 'none';
                     
-                    if (data.warning === 'underexposure') {
-                        document.getElementById('underexposure-warning').style.display = 'block';
-                    } else if (data.warning === 'overexposure') {
-                        document.getElementById('overexposure-warning').style.display = 'block';
-                    } else if (data.warning === 'too_far') {
-                        document.getElementById('too-far-warning').style.display = 'block';
-                    }
+                    // Show result card
+                    resultCard.style.display = 'block';
                     
-                    // Scroll to results
-                    document.getElementById('result-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
-                })
-                .catch((error) => {
-                    console.error('Error:', error);
-                    document.getElementById('loadingSpinner').style.display = 'none';
-                    alert('An error occurred. Please try again.');
-                });
+                    // Scroll to result
+                    resultCard.scrollIntoView({ behavior: 'smooth' });
+                } catch (error) {
+                    console.error('Error calculating light settings:', error);
+                    alert('An error occurred during calculation. Please check your inputs and try again.');
+                } finally {
+                    // Hide loading spinner
+                    loadingSpinner.style.display = 'none';
+                }
             });
         });
     </script>
-    
-    <!-- Bootstrap Bundle with Popper -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
