@@ -15,14 +15,8 @@ class LightingVisualizer {
             return;
         }
         
-        // Set canvas size directly with attributes
-        this.canvas.setAttribute('width', width || 800);
-        this.canvas.setAttribute('height', height || 500);
-        
+        // We're using the width and height set in the HTML
         this.ctx = this.canvas.getContext('2d');
-        this.canvas.style.width = '100%';
-        this.canvas.style.height = '100%';
-        this.canvas.style.display = 'block';
         this.lightData = lightData;
         
         console.log(`Canvas initialized with size: ${this.canvas.width}x${this.canvas.height}`);
@@ -453,24 +447,17 @@ function initVisualizer(lightData) {
         window.visualizer = null;
     }
     
-    // Get canvas container dimensions
-    const container = document.querySelector('.visualizer-container');
-    if (!container) {
-        console.error('Cannot find visualizer container element');
-        return;
-    }
-    
     const canvas = document.getElementById('lighting-canvas');
     if (!canvas) {
         console.error('Cannot find lighting-canvas element');
         return;
     }
     
-    // Set dimensions
-    const width = container.clientWidth - 20; // Accounting for padding
-    const height = Math.min(500, width * 0.75); // Maintain aspect ratio
+    // We're using fixed dimensions in the HTML
+    const width = canvas.width;
+    const height = canvas.height;
     
-    console.log(`Canvas dimensions: ${width}x${height}`);
+    console.log(`Using fixed canvas dimensions: ${width}x${height}`);
     
     // Create the visualizer
     window.visualizer = new LightingVisualizer('lighting-canvas', width, height, lightData);
