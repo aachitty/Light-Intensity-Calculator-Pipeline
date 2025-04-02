@@ -5,89 +5,211 @@ from scipy import interpolate
 
 app = Flask(__name__, static_url_path='/static', static_folder='static')
 
-# SkyPanel S60-C photometric data
-skypanel_data = {
-    "Standard": {
-        3: {"3200K": 1305, "5600K": 1535},
-        5: {"3200K": 470, "5600K": 553},
-        7: {"3200K": 240, "5600K": 282},
-        9: {"3200K": 145, "5600K": 171}
+# Comprehensive lighting data for multiple professional fixtures
+# Structure: light_data[light_model][modifier_type][distance][color_temp] = illuminance (lux)
+light_data = {
+    # ARRI SkyPanel S60-C data with different diffusion options
+    "ARRI SkyPanel S60-C": {
+        "modifiers": {
+            "Standard": {
+                3: {"3200K": 1305, "5600K": 1535},
+                5: {"3200K": 470, "5600K": 553},
+                7: {"3200K": 240, "5600K": 282},
+                9: {"3200K": 145, "5600K": 171}
+            },
+            "Lite": {
+                3: {"3200K": 1328, "5600K": 1561},
+                5: {"3200K": 478, "5600K": 562},
+                7: {"3200K": 244, "5600K": 287},
+                9: {"3200K": 148, "5600K": 173}
+            },
+            "Heavy": {
+                3: {"3200K": 1031, "5600K": 1213},
+                5: {"3200K": 371, "5600K": 437},
+                7: {"3200K": 189, "5600K": 223},
+                9: {"3200K": 115, "5600K": 135}
+            },
+            "Intensifier": {
+                3: {"3200K": 2011, "5600K": 2431},
+                5: {"3200K": 724, "5600K": 875},
+                7: {"3200K": 369, "5600K": 447},
+                9: {"3200K": 223, "5600K": 270}
+            }
+        },
+        "max_output": 45288,  # Maximum output in lux·m²
+        "color_temps": ["3200K", "5600K"]
     },
-    "Lite": {
-        3: {"3200K": 1328, "5600K": 1561},
-        5: {"3200K": 478, "5600K": 562},
-        7: {"3200K": 244, "5600K": 287},
-        9: {"3200K": 148, "5600K": 173}
+    
+    # Aputure LS 300X data with different beam angles
+    "Aputure LS 300X": {
+        "modifiers": {
+            "15° Beam": {
+                1: {"5600K": 39500},
+                3: {"5600K": 4400},
+                5: {"5600K": 1580},
+                7: {"5600K": 805}
+            },
+            "30° Beam": {
+                1: {"5600K": 19000},
+                3: {"5600K": 2110},
+                5: {"5600K": 760},
+                7: {"5600K": 388}
+            },
+            "45° Beam": {
+                1: {"5600K": 10500},
+                3: {"5600K": 1166},
+                5: {"5600K": 420},
+                7: {"5600K": 214}
+            },
+            "60° Beam": {
+                1: {"5600K": 5800},
+                3: {"5600K": 644},
+                5: {"5600K": 232},
+                7: {"5600K": 118}
+            }
+        },
+        "max_output": 39500,  # Maximum output in lux·m²
+        "color_temps": ["5600K"]
     },
-    "Heavy": {
-        3: {"3200K": 1031, "5600K": 1213},
-        5: {"3200K": 371, "5600K": 437},
-        7: {"3200K": 189, "5600K": 223},
-        9: {"3200K": 115, "5600K": 135}
+    
+    # Litepanels Gemini 2x1 Hard RGBWW data with different diffusion options
+    "Litepanels Gemini 2x1": {
+        "modifiers": {
+            "No Diffusion": {
+                1: {"3200K": 21000, "5600K": 25000},
+                3: {"3200K": 2330, "5600K": 2780},
+                5: {"3200K": 840, "5600K": 1000}
+            },
+            "Light Diffusion": {
+                1: {"3200K": 16800, "5600K": 20000},
+                3: {"3200K": 1866, "5600K": 2222},
+                5: {"3200K": 672, "5600K": 800}
+            },
+            "Medium Diffusion": {
+                1: {"3200K": 12600, "5600K": 15000},
+                3: {"3200K": 1400, "5600K": 1666},
+                5: {"3200K": 504, "5600K": 600}
+            },
+            "Heavy Diffusion": {
+                1: {"3200K": 8400, "5600K": 10000},
+                3: {"3200K": 933, "5600K": 1111},
+                5: {"3200K": 336, "5600K": 400}
+            }
+        },
+        "max_output": 25000,  # Maximum output in lux·m²
+        "color_temps": ["3200K", "5600K"]
     },
-    "Intensifier": {
-        3: {"3200K": 2011, "5600K": 2431},
-        5: {"3200K": 724, "5600K": 875},
-        7: {"3200K": 369, "5600K": 447},
-        9: {"3200K": 223, "5600K": 270}
+    
+    # Aputure MC RGBWW LED Panel (compact on-camera light)
+    "Aputure MC": {
+        "modifiers": {
+            "No Diffusion": {
+                0.5: {"3200K": 380, "5600K": 400},
+                1: {"3200K": 95, "5600K": 100},
+                2: {"3200K": 24, "5600K": 25}
+            },
+            "With Diffusion": {
+                0.5: {"3200K": 304, "5600K": 320},
+                1: {"3200K": 76, "5600K": 80},
+                2: {"3200K": 19, "5600K": 20}
+            }
+        },
+        "max_output": 100,  # Maximum output in lux·m²
+        "color_temps": ["3200K", "5600K"]
     }
 }
 
-# Create intensity interpolation functions for each diffusion and color temperature
+# Keep the original skypanel_data for backward compatibility until we fully transition
+skypanel_data = light_data["ARRI SkyPanel S60-C"]["modifiers"]
+
+# Create intensity interpolation functions for all light models, modifiers and color temperatures
 def create_interpolation_functions():
     interp_funcs = {}
     
-    for diffusion in skypanel_data:
-        interp_funcs[diffusion] = {}
+    for light_model, light_data_values in light_data.items():
+        interp_funcs[light_model] = {}
         
-        for cct in ["3200K", "5600K"]:
-            distances = []
-            illuminances = []
+        # Get modifiers (diffusion types, beam angles, etc.) for this light
+        modifiers = light_data_values["modifiers"]
+        
+        for modifier_type, modifier_data in modifiers.items():
+            interp_funcs[light_model][modifier_type] = {}
             
-            for distance, cct_values in skypanel_data[diffusion].items():
-                distances.append(distance)
-                illuminances.append(cct_values[cct])
+            # Get available color temperatures for this light
+            color_temps = light_data_values["color_temps"]
             
-            # Convert lists to numpy arrays for interpolation
-            distances = np.array(distances)
-            illuminances = np.array(illuminances)
-            
-            # Create interpolation function (using inverse square law relationship)
-            # We'll interpolate distance -> illuminance
-            interp_funcs[diffusion][cct] = interpolate.interp1d(
-                distances, 
-                illuminances, 
-                kind='linear',  # Changed to linear for more predictable interpolation
-                bounds_error=False,
-                fill_value=(illuminances[0], illuminances[-1])
-            )
+            for cct in color_temps:
+                distances = []
+                illuminances = []
+                
+                # Collect data points for this specific light model, modifier and color temp
+                for distance, cct_values in modifier_data.items():
+                    if cct in cct_values:  # Make sure this color temp exists for this distance
+                        distances.append(distance)
+                        illuminances.append(cct_values[cct])
+                
+                # Skip if no data points available
+                if not distances:
+                    continue
+                
+                # Convert lists to numpy arrays for interpolation
+                distances = np.array(distances)
+                illuminances = np.array(illuminances)
+                
+                # Create interpolation function (using linear interpolation)
+                interp_funcs[light_model][modifier_type][cct] = interpolate.interp1d(
+                    distances, 
+                    illuminances, 
+                    kind='linear',
+                    bounds_error=False,
+                    fill_value=(illuminances[0], illuminances[-1])
+                )
     
     return interp_funcs
 
-# Create reverse interpolation for illuminance -> distance
-def get_distance_for_illuminance(illuminance, diffusion, color_temp, interp_funcs):
-    # Get the measured distances and corresponding illuminances
-    distances = list(skypanel_data[diffusion].keys())
-    illuminances = [skypanel_data[diffusion][d][color_temp] for d in distances]
+# Create reverse interpolation for illuminance -> distance for any light model
+def get_distance_for_illuminance(illuminance, light_model, modifier_type, color_temp, interp_funcs):
+    # Check if we have all the required data
+    if light_model not in light_data:
+        print(f"Warning: Light model '{light_model}' not found, using ARRI SkyPanel S60-C")
+        light_model = "ARRI SkyPanel S60-C"
     
-    # We don't use the interpolation function directly here because we need the inverse
-    # relationship. Instead, we'll use the inverse square law to estimate distance
+    if modifier_type not in light_data[light_model]["modifiers"]:
+        print(f"Warning: Modifier '{modifier_type}' not found for {light_model}, using default")
+        modifier_type = list(light_data[light_model]["modifiers"].keys())[0]  # Use first available
     
-    # First, let's find the closest measured points
-    distances = np.array(distances)
-    illuminances = np.array(illuminances)
+    if color_temp not in light_data[light_model]["color_temps"]:
+        print(f"Warning: Color temp '{color_temp}' not available for {light_model}, using default")
+        color_temp = light_data[light_model]["color_temps"][0]  # Use first available
+    
+    # Get the measured distances and corresponding illuminances for this specific light configuration
+    modifier_data = light_data[light_model]["modifiers"][modifier_type]
+    distances = []
+    illuminances = []
+    
+    for distance, color_data in modifier_data.items():
+        if color_temp in color_data:
+            distances.append(distance)
+            illuminances.append(color_data[color_temp])
+    
+    # Sort by distance
+    sorted_indices = np.argsort(distances)
+    distances = np.array(distances)[sorted_indices]
+    illuminances = np.array(illuminances)[sorted_indices]
     
     # Ensure we're within the reasonable range of our data
     max_illuminance = max(illuminances)
     min_illuminance = min(illuminances)
+    min_distance = min(distances)
+    max_distance = max(distances)
     
     if illuminance > max_illuminance:
         # If we need more light than available at the closest distance, we need to increase intensity
-        return min(distances), illuminance / max_illuminance * 100
+        return min_distance, illuminance / max_illuminance * 100
     
     if illuminance < min_illuminance:
         # If we need less light than available at the farthest distance, we need to decrease intensity
-        return max(distances), illuminance / min_illuminance * 100
+        return max_distance, illuminance / min_illuminance * 100
     
     # For values within our measurement range, we'll use inverse square law interpolation
     # Find the reference point with closest illuminance
@@ -99,8 +221,8 @@ def get_distance_for_illuminance(illuminance, diffusion, color_temp, interp_func
     # If ref_illuminance is at ref_distance, then illuminance should be at:
     calculated_distance = ref_distance * math.sqrt(ref_illuminance / illuminance)
     
-    # Ensure minimum distance is 1 meter
-    calculated_distance = max(1.0, calculated_distance)
+    # Ensure minimum distance is within the appropriate range for this light
+    calculated_distance = max(min_distance, min(max_distance, calculated_distance))
     
     # Return the calculated distance and intensity percentage
     # The intensity percentage will be 100% unless adjusted in the conditions above
@@ -359,94 +481,83 @@ interp_funcs = create_interpolation_functions()
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    # Prepare light models, modifiers and color temps for the template
+    light_models = list(light_data.keys())
+    
+    # Create nested structure of modifiers for each light model
+    modifiers_by_model = {}
+    color_temps_by_model = {}
+    
+    for model in light_models:
+        modifiers_by_model[model] = list(light_data[model]["modifiers"].keys())
+        color_temps_by_model[model] = light_data[model]["color_temps"]
+    
+    # Pass the data to the template
+    return render_template('index.html', 
+                          light_models=light_models,
+                          modifiers_by_model=modifiers_by_model,
+                          color_temps_by_model=color_temps_by_model)
 
 @app.route('/calculate', methods=['POST'])
 def calculate():
-    # Get form data
-    data = request.get_json()
-    
-    t_stop = float(data.get('t_stop', 2.8))
-    iso = int(data.get('iso', 800))
-    framerate = int(data.get('framerate', 24))
-    light_model = data.get('light_model', 'SkyPanel S60-C')
-    diffusion = data.get('diffusion', 'Standard')
-    color_temp = data.get('color_temp', '5600K')
-    calc_mode = data.get('calc_mode', 'Auto Calculate')
-    
-    print(f"Received request with light model: {light_model}, diffusion type: {diffusion}")
-    
-    # Set preferred distance or intensity based on mode
-    preferred_distance = None
-    preferred_intensity = None
-    
-    if calc_mode == 'Specify Distance':
-        preferred_distance = float(data.get('preferred_distance', 3.0))
-    elif calc_mode == 'Specify Intensity':
-        preferred_intensity = float(data.get('preferred_intensity', 70))
-    
-    # Apply light model multipliers (as if different models have different brightness factors)
-    # These are just for demonstration - in a real app we'd have real photometric data for each model
-    light_model_multiplier = 1.0
-    if light_model == 'Haplon H200':
-        light_model_multiplier = 1.3  # Simulating a more powerful light
-    elif light_model == 'Haplon H100':
-        light_model_multiplier = 0.7  # Simulating a less powerful light
-    
-    # Calculate light settings
-    distance, intensity, exposure_warning = calculate_light_settings_skypanels60(
-        t_stop, iso, framerate, diffusion, color_temp, interp_funcs,
-        preferred_distance, preferred_intensity
-    )
-    
-    # For Specify Distance mode, let's return different intensity values for different diffusion types and light models
-    if calc_mode == 'Specify Distance' and preferred_distance is not None:
-        # Calculate a more distinct intensity based on diffusion type
-        # This will help users see the difference in UI while maintaining correct exposure math
-        if diffusion == 'Standard':
-            # Use the calculated intensity
-            pass
-        elif diffusion == 'Lite':
-            # Lite diffusion requires slightly less intensity for same illuminance
-            intensity = max(10.0, intensity * 0.95)
-        elif diffusion == 'Heavy':
-            # Heavy diffusion requires more intensity for same illuminance
-            intensity = min(100.0, intensity * 1.25)
-        elif diffusion == 'Intensifier':
-            # Intensifier requires much less intensity for same illuminance
-            intensity = max(10.0, intensity * 0.7)
+    try:
+        # Get form data
+        data = request.get_json()
         
-        # Apply light model factor - for different lights at the same distance
-        # we'd need different intensity settings
-        new_intensity = intensity / light_model_multiplier
+        t_stop = float(data.get('t_stop', 2.8))
+        iso = int(data.get('iso', 800))
+        framerate = int(data.get('framerate', 24))
+        light_model = data.get('light_model', 'ARRI SkyPanel S60-C')
+        modifier_type = data.get('modifier_type', 'Standard')
+        color_temp = data.get('color_temp', '5600K')
+        calc_mode = data.get('calc_mode', 'Auto Calculate')
         
-        # Ensure intensity stays within valid range
-        intensity = max(10.0, min(100.0, new_intensity))
-    
-    # For Auto Calculate and Specify Intensity modes, adjust the distance based on light model
-    else:
-        # Adjust distance based on light model power (more powerful lights can be placed further)
-        new_distance = distance * math.sqrt(light_model_multiplier)
-        distance = max(1.0, min(15.0, new_distance))
-    
-    # Prepare response
-    response = {
-        'distance': distance,
-        'intensity': intensity,
-        'exposure_warning': exposure_warning,
-        'calculation_mode_text': '',
-        'diffusion_type': diffusion,  # Include diffusion type in response
-        'light_model': light_model    # Include light model in response
-    }
-    
-    if calc_mode == 'Specify Distance':
-        response['calculation_mode_text'] = f"at your specified distance of {preferred_distance} meters"
-    elif calc_mode == 'Specify Intensity':
-        response['calculation_mode_text'] = f"at your specified intensity of {preferred_intensity}%"
-    else:
-        response['calculation_mode_text'] = "with automatically optimized settings"
-    
-    return jsonify(response)
+        print(f"Received request with light model: {light_model}, modifier type: {modifier_type}, color temp: {color_temp}")
+        
+        # Import the new calculator function
+        from new_calculator import calculate_light_settings
+        
+        # Set preferred distance or intensity based on mode
+        preferred_distance = None
+        preferred_intensity = None
+        
+        if calc_mode == 'Specify Distance':
+            preferred_distance = float(data.get('preferred_distance', 3.0))
+        elif calc_mode == 'Specify Intensity':
+            preferred_intensity = float(data.get('preferred_intensity', 70))
+        
+        # Calculate light settings using the new universal calculator
+        distance, intensity, exposure_warning, calculation_mode_text = calculate_light_settings(
+            t_stop, iso, framerate, 
+            light_model, modifier_type, color_temp, light_data,
+            preferred_distance=preferred_distance,
+            preferred_intensity=preferred_intensity
+        )
+        
+        # Prepare response
+        response = {
+            'distance': distance,
+            'intensity': intensity,
+            'exposure_warning': exposure_warning,
+            'calculation_mode_text': calculation_mode_text,
+            'modifier_type': modifier_type,
+            'light_model': light_model
+        }
+        
+        # Add warning messages based on exposure_warning flag
+        if exposure_warning == "insufficient_light":
+            response['warning'] = "Warning: The calculated intensity exceeds 100%. The light has been set to maximum, but the subject may be underexposed."
+        elif exposure_warning == "too_much_light":
+            response['warning'] = "Note: The calculated intensity is very low. Consider using a higher T-stop or lower ISO to optimize your light usage."
+        elif exposure_warning == "too_far":
+            response['warning'] = "Note: The calculated distance is very far. The light has been limited to a practical distance and intensity adjusted."
+        
+        return jsonify(response)
+    except Exception as e:
+        print(f"Error calculating: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

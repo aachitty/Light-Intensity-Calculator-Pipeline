@@ -208,30 +208,83 @@
                     <div class="col-md-4 mb-3">
                         <label for="light-model-selector">Light Model</label>
                         <select id="light-model-selector" class="form-select">
-                            <option value="SkyPanel S60-C" selected>ARRI SkyPanel S60-C</option>
-                            <option value="Haplon H200">Haplon H200</option>
-                            <option value="Haplon H100">Haplon H100</option>
+                            {% for model in light_models %}
+                            <option value="{{ model }}" {% if model == "ARRI SkyPanel S60-C" %}selected{% endif %}>{{ model }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                     
                     <div class="col-md-4 mb-3">
-                        <label for="diffusion-selector">Diffusion Type</label>
-                        <select id="diffusion-selector" class="form-select">
-                            <option value="Standard" selected>Standard</option>
-                            <option value="Lite">Lite</option>
-                            <option value="Heavy">Heavy</option>
-                            <option value="Intensifier">Intensifier</option>
+                        <label for="modifier-selector">Modifier Type</label>
+                        <select id="modifier-selector" class="form-select">
+                            <!-- This will be populated dynamically based on selected light model -->
                         </select>
                     </div>
                     
                     <div class="col-md-4 mb-3">
                         <label for="color-temp-selector">Color Temperature</label>
                         <select id="color-temp-selector" class="form-select">
-                            <option value="3200K">3200K (Tungsten)</option>
-                            <option value="5600K" selected>5600K (Daylight)</option>
+                            <!-- This will be populated dynamically based on selected light model -->
                         </select>
                     </div>
                 </div>
+                
+                <script>
+                    // Store the modifiers and color temps data from the backend
+                    const modifiersByModel = {{ modifiers_by_model|tojson }};
+                    const colorTempsByModel = {{ color_temps_by_model|tojson }};
+                    
+                    // Function to update modifiers dropdown based on selected light model
+                    function updateModifiersDropdown() {
+                        const lightModel = document.getElementById('light-model-selector').value;
+                        const modifierSelector = document.getElementById('modifier-selector');
+                        
+                        // Clear current options
+                        modifierSelector.innerHTML = '';
+                        
+                        // Add new options based on selected light model
+                        if (modifiersByModel[lightModel]) {
+                            modifiersByModel[lightModel].forEach(modifier => {
+                                const option = document.createElement('option');
+                                option.value = modifier;
+                                option.textContent = modifier;
+                                modifierSelector.appendChild(option);
+                            });
+                        }
+                    }
+                    
+                    // Function to update color temps dropdown based on selected light model
+                    function updateColorTempsDropdown() {
+                        const lightModel = document.getElementById('light-model-selector').value;
+                        const colorTempSelector = document.getElementById('color-temp-selector');
+                        
+                        // Clear current options
+                        colorTempSelector.innerHTML = '';
+                        
+                        // Add new options based on selected light model
+                        if (colorTempsByModel[lightModel]) {
+                            colorTempsByModel[lightModel].forEach(temp => {
+                                const option = document.createElement('option');
+                                option.value = temp;
+                                option.textContent = temp === "3200K" ? "3200K (Tungsten)" : "5600K (Daylight)";
+                                colorTempSelector.appendChild(option);
+                            });
+                        }
+                    }
+                    
+                    // Initialize the dropdowns
+                    document.addEventListener('DOMContentLoaded', function() {
+                        // Setup event listener for light model changes
+                        document.getElementById('light-model-selector').addEventListener('change', function() {
+                            updateModifiersDropdown();
+                            updateColorTempsDropdown();
+                        });
+                        
+                        // Initialize the dropdowns when the page loads
+                        updateModifiersDropdown();
+                        updateColorTempsDropdown();
+                    });
+                </script>
             </div>
         </div>
         
@@ -425,7 +478,7 @@
                 const iso = document.getElementById('iso-input').value;
                 const framerate = document.getElementById('framerate-input').value;
                 const lightModel = document.getElementById('light-model-selector').value;
-                const diffusion = document.getElementById('diffusion-selector').value;
+                const modifierType = document.getElementById('modifier-selector').value;
                 const colorTemp = document.getElementById('color-temp-selector').value;
                 
                 // Get calculation mode
@@ -451,7 +504,7 @@
                     iso: parseInt(iso),
                     framerate: parseInt(framerate),
                     light_model: lightModel,
-                    diffusion: diffusion,
+                    modifier_type: modifierType,
                     color_temp: colorTemp,
                     calc_mode: calcMode
                 };
@@ -487,7 +540,7 @@
                     document.getElementById('iso-result').textContent = iso;
                     document.getElementById('framerate-result').textContent = framerate;
                     document.getElementById('light-model-result').textContent = lightModel;
-                    document.getElementById('diffusion-result').textContent = diffusion;
+                    document.getElementById('diffusion-result').textContent = modifierType;
                     document.getElementById('color-temp-result').textContent = colorTemp;
                     document.getElementById('calculation-mode-text').textContent = data.calculation_mode_text;
                     
