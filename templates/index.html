@@ -481,6 +481,22 @@
                             <h5>Visualizer Results</h5>
                             <p>Add lights to the scene and move them to see real-time calculations.</p>
                         </div>
+                        
+                        <!-- Debug Panel for Visualizer -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-secondary text-white">
+                                <h5 class="mb-0">Visualizer Diagnostics</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="canvas-debug">
+                                    <p>Waiting for visualizer initialization...</p>
+                                </div>
+                                <div class="mt-2">
+                                    <button id="manual-render-btn" class="btn btn-sm btn-warning" onclick="testCanvasRendering()">Force Render Test</button>
+                                    <button id="reload-visualizer-btn" class="btn btn-sm btn-info" onclick="location.reload()">Reload Page</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -704,19 +720,19 @@
         window.addEventListener('load', function() {
             console.log('Window loaded, loading visualizer script');
             
-            // Dynamically load 2D Visualizer Script
+            // Dynamically load the fixed 2D Visualizer Script
             const script = document.createElement('script');
-            script.src = '/static/js/2d-visualizer.js';
+            script.src = '/static/js/2d-visualizer-fixed.js';
             script.onload = function() {
-                console.log('Visualizer script loaded');
+                console.log('Fixed visualizer script loaded');
                 // Check if we're on the visualizer tab
                 if (document.querySelector('#visualizer-tab').classList.contains('active')) {
-                    console.log('On visualizer tab, initializing');
+                    console.log('On visualizer tab, initializing fixed visualizer');
                     setTimeout(() => {
-                        if (typeof initVisualizer === 'function') {
-                            initVisualizer(modifiersByModel);
+                        if (typeof initFixedVisualizer === 'function') {
+                            initFixedVisualizer(modifiersByModel);
                         } else {
-                            console.error('initVisualizer function not found');
+                            console.error('initFixedVisualizer function not found');
                         }
                     }, 200);
                 }
@@ -730,6 +746,14 @@
                 console.log('Visualizer test script loaded');
             };
             document.body.appendChild(testScript);
+            
+            // Load the visualizer fix script (diagnostic tool)
+            const fixScript = document.createElement('script');
+            fixScript.src = '/static/js/visualizer-fix.js';
+            fixScript.onload = function() {
+                console.log('Visualizer fix script loaded');
+            };
+            document.body.appendChild(fixScript);
         });
     </script>
 </body>

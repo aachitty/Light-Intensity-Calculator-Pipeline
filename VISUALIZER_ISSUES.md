@@ -60,11 +60,23 @@ constructor(canvasId, width, height, lightData) {
 
 ## Next Steps for Troubleshooting
 
-1. **Add More Debug Logging**: Add console logs in the render method and draw functions to see if they're being called.
-2. **Simplify the Rendering**: Create a test function that just draws a single shape to verify basic rendering works.
-3. **Force Redraw**: Add a button that explicitly triggers a redraw to test if the issue is with automatic rendering.
-4. **Check Tab Switching**: Verify the tab switching logic is working correctly.
-5. **Inspect DOM**: Use browser tools to inspect the canvas element and ensure it's visible and properly sized.
+1. **Add More Debug Logging**: Add console logs in the render method and draw functions to see if they're being called. ✅
+2. **Simplify the Rendering**: Create a test function that just draws a single shape to verify basic rendering works. ✅
+3. **Force Redraw**: Add a button that explicitly triggers a redraw to test if the issue is with automatic rendering. ✅
+4. **Check Tab Switching**: Verify the tab switching logic is working correctly. ✅
+5. **Inspect DOM**: Use browser tools to inspect the canvas element and ensure it's visible and properly sized. ✅
+
+## Update: Enhanced Debugging Features (April 2, 2025)
+
+We've implemented several troubleshooting enhancements to diagnose and fix the 2D visualizer rendering issues:
+
+1. **Diagnostic Panel**: Added a dedicated diagnostics panel that reports on canvas initialization status, context availability, and rendering success.
+2. **Force Render Test Button**: Implemented a button to manually force a canvas rendering test, which draws basic shapes to verify the canvas is working.
+3. **Enhanced Error Reporting**: Improved error handling and reporting to provide more detailed information about initialization failures.
+4. **Staged Initialization**: Modified the visualizer initialization process to perform incremental tests, verifying each step before proceeding.
+5. **Visual Feedback**: Added visual feedback during initialization to confirm rendering is working properly.
+
+These changes should help identify the precise cause of the rendering issues, particularly whether they are related to canvas initialization, context acquisition, or the rendering process itself.
 
 ## Implementation Notes
 
