@@ -154,11 +154,49 @@ def calculate_light_settings(desired_t_stop, input_iso, input_framerate,
         if "ARRI SkyPanel" in light_model:
             # Use special handling for SkyPanel series to ensure closer to original calculations
             max_illuminance_at_distance = illuminance_at_preferred  # Full power at this distance
-            intensity_percentage = (required_illuminance / max_illuminance_at_distance) * 100
-            print(f"Using SkyPanel specialized calculation")
+            
+            # Apply diffusion-specific adjustments to create distinct values
+            if modifier_type == "Standard":
+                # Use the calculated intensity directly
+                modifier_factor = 1.0
+            elif modifier_type == "Lite":
+                # Lite diffusion requires slightly less intensity for same illuminance
+                modifier_factor = 0.95
+            elif modifier_type == "Heavy":
+                # Heavy diffusion requires more intensity for same illuminance
+                modifier_factor = 1.25
+            elif modifier_type == "Intensifier":
+                # Intensifier requires much less intensity for same illuminance
+                modifier_factor = 0.7
+            else:
+                modifier_factor = 1.0
+                
+            intensity_percentage = (required_illuminance / max_illuminance_at_distance) * 100 * modifier_factor
+            print(f"Using SkyPanel specialized calculation with modifier factor: {modifier_factor}")
         else:
-            # Standard calculation for other lights
-            intensity_percentage = (required_illuminance / illuminance_at_preferred) * 100
+            # Apply modifier-specific adjustments based on type
+            if "Beam" in modifier_type:
+                # For different beam angles, adjust proportionally to angle
+                beam_angle = float(modifier_type.split("°")[0])
+                max_beam = 60.0  # Typically the widest beam angle
+                beam_factor = beam_angle / max_beam if max_beam > 0 else 1.0
+                intensity_percentage = (required_illuminance / illuminance_at_preferred) * 100 * beam_factor
+                print(f"Using beam angle modifier factor: {beam_factor}")
+            elif "Diffusion" in modifier_type:
+                # For diffusion panels on other lights
+                if "Heavy" in modifier_type:
+                    diffusion_factor = 1.2
+                elif "Medium" in modifier_type:
+                    diffusion_factor = 1.1
+                elif "Light" in modifier_type:
+                    diffusion_factor = 0.95
+                else:
+                    diffusion_factor = 1.0
+                intensity_percentage = (required_illuminance / illuminance_at_preferred) * 100 * diffusion_factor
+                print(f"Using diffusion modifier factor: {diffusion_factor}")
+            else:
+                # Standard calculation for other lights
+                intensity_percentage = (required_illuminance / illuminance_at_preferred) * 100
         
         print(f"Required illuminance: {required_illuminance} lux")
         print(f"Available illuminance at {preferred_distance}m: {illuminance_at_preferred} lux")
