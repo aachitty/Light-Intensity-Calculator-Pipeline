@@ -722,6 +722,14 @@
                 }
             };
             document.body.appendChild(script);
+            
+            // Load the visualizer test script
+            const testScript = document.createElement('script');
+            testScript.src = '/static/js/visualizer-test.js';
+            testScript.onload = function() {
+                console.log('Visualizer test script loaded');
+            };
+            document.body.appendChild(testScript);
         });
     </script>
 </body>
