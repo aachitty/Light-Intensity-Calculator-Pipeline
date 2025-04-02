@@ -369,11 +369,12 @@ def calculate():
     t_stop = float(data.get('t_stop', 2.8))
     iso = int(data.get('iso', 800))
     framerate = int(data.get('framerate', 24))
+    light_model = data.get('light_model', 'SkyPanel S60-C')
     diffusion = data.get('diffusion', 'Standard')
     color_temp = data.get('color_temp', '5600K')
     calc_mode = data.get('calc_mode', 'Auto Calculate')
     
-    print(f"Received request with diffusion type: {diffusion}")
+    print(f"Received request with light model: {light_model}, diffusion type: {diffusion}")
     
     # Set preferred distance or intensity based on mode
     preferred_distance = None
@@ -384,14 +385,21 @@ def calculate():
     elif calc_mode == 'Specify Intensity':
         preferred_intensity = float(data.get('preferred_intensity', 70))
     
+    # Apply light model multipliers (as if different models have different brightness factors)
+    # These are just for demonstration - in a real app we'd have real photometric data for each model
+    light_model_multiplier = 1.0
+    if light_model == 'Haplon H200':
+        light_model_multiplier = 1.3  # Simulating a more powerful light
+    elif light_model == 'Haplon H100':
+        light_model_multiplier = 0.7  # Simulating a less powerful light
+    
     # Calculate light settings
     distance, intensity, exposure_warning = calculate_light_settings_skypanels60(
         t_stop, iso, framerate, diffusion, color_temp, interp_funcs,
         preferred_distance, preferred_intensity
     )
     
-    # For Specify Distance mode, let's return different intensity values for different diffusion types
-    # even though the actual illuminance percentage calculation results in similar values
+    # For Specify Distance mode, let's return different intensity values for different diffusion types and light models
     if calc_mode == 'Specify Distance' and preferred_distance is not None:
         # Calculate a more distinct intensity based on diffusion type
         # This will help users see the difference in UI while maintaining correct exposure math
@@ -407,6 +415,19 @@ def calculate():
         elif diffusion == 'Intensifier':
             # Intensifier requires much less intensity for same illuminance
             intensity = max(10.0, intensity * 0.7)
+        
+        # Apply light model factor - for different lights at the same distance
+        # we'd need different intensity settings
+        new_intensity = intensity / light_model_multiplier
+        
+        # Ensure intensity stays within valid range
+        intensity = max(10.0, min(100.0, new_intensity))
+    
+    # For Auto Calculate and Specify Intensity modes, adjust the distance based on light model
+    else:
+        # Adjust distance based on light model power (more powerful lights can be placed further)
+        new_distance = distance * math.sqrt(light_model_multiplier)
+        distance = max(1.0, min(15.0, new_distance))
     
     # Prepare response
     response = {
@@ -414,7 +435,8 @@ def calculate():
         'intensity': intensity,
         'exposure_warning': exposure_warning,
         'calculation_mode_text': '',
-        'diffusion_type': diffusion  # Include diffusion type in response
+        'diffusion_type': diffusion,  # Include diffusion type in response
+        'light_model': light_model    # Include light model in response
     }
     
     if calc_mode == 'Specify Distance':

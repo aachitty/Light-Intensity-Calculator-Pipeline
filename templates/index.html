@@ -205,7 +205,16 @@
             </div>
             <div class="card-body">
                 <div class="row">
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-4 mb-3">
+                        <label for="light-model-selector">Light Model</label>
+                        <select id="light-model-selector" class="form-select">
+                            <option value="SkyPanel S60-C" selected>ARRI SkyPanel S60-C</option>
+                            <option value="Haplon H200">Haplon H200</option>
+                            <option value="Haplon H100">Haplon H100</option>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-4 mb-3">
                         <label for="diffusion-selector">Diffusion Type</label>
                         <select id="diffusion-selector" class="form-select">
                             <option value="Standard" selected>Standard</option>
@@ -215,7 +224,7 @@
                         </select>
                     </div>
                     
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-4 mb-3">
                         <label for="color-temp-selector">Color Temperature</label>
                         <select id="color-temp-selector" class="form-select">
                             <option value="3200K">3200K (Tungsten)</option>
@@ -336,7 +345,7 @@
                         <span id="calculation-mode-text">with automatically optimized settings</span>:
                     </p>
                     <ol>
-                        <li>Position your Haplon light <strong><span id="distance-result-text">3.0 meters</span></strong> from the subject</li>
+                        <li>Position your <span id="light-model-result">ARRI SkyPanel S60-C</span> <strong><span id="distance-result-text">3.0 meters</span></strong> from the subject</li>
                         <li>Set the light intensity to <strong><span id="intensity-result-text">70%</span></strong> of maximum output</li>
                     </ol>
                     <p>These settings will provide proper exposure based on precise photometric data and the inverse square law.</p>
@@ -347,7 +356,7 @@
     
     <footer class="text-center">
         <div class="container">
-            <p>© 2023 Haplon Light Intensity Calculator | Professional Lighting Tool</p>
+            <p>© 2024 Haplon Light Intensity Calculator | Professional Lighting Tool</p>
         </div>
     </footer>
     
@@ -415,6 +424,7 @@
                     : tStopSelector.value;
                 const iso = document.getElementById('iso-input').value;
                 const framerate = document.getElementById('framerate-input').value;
+                const lightModel = document.getElementById('light-model-selector').value;
                 const diffusion = document.getElementById('diffusion-selector').value;
                 const colorTemp = document.getElementById('color-temp-selector').value;
                 
@@ -440,6 +450,7 @@
                     t_stop: parseFloat(tStop),
                     iso: parseInt(iso),
                     framerate: parseInt(framerate),
+                    light_model: lightModel,
                     diffusion: diffusion,
                     color_temp: colorTemp,
                     calc_mode: calcMode
@@ -475,6 +486,7 @@
                     document.getElementById('t-stop-result').textContent = tStop;
                     document.getElementById('iso-result').textContent = iso;
                     document.getElementById('framerate-result').textContent = framerate;
+                    document.getElementById('light-model-result').textContent = lightModel;
                     document.getElementById('diffusion-result').textContent = diffusion;
                     document.getElementById('color-temp-result').textContent = colorTemp;
                     document.getElementById('calculation-mode-text').textContent = data.calculation_mode_text;
