@@ -1,0 +1,12 @@
+Working Version: Fully Functioning Calculations
+
+This commit represents the completed working version of the Haplon Light Intensity Calculator with all calculations functioning properly. Key improvements include:
+
+1. Fixed intensity calculations for different modifier types
+2. Added specialized handling for beam angle modifiers and diffusion types
+3. Updated result display text to show "modifier" instead of "diffusion"
+4. Implemented proper differentiation between different light models and their characteristics
+5. Each light/modifier combination now returns appropriate and distinct values
+6. Improved documentation with detailed README
+
+The application now correctly calculates distance and intensity values based on the selected light model, modifier type, and color temperature, ensuring reliable results for professional cinematographers.
