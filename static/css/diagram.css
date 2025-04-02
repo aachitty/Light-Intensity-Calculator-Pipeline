@@ -1,0 +1,142 @@
+/* Interactive Lighting Diagram Styles */
+#diagram-container {
+    position: relative;
+    width: 100%;
+    background-color: #1a1a1a;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    margin-bottom: 20px;
+}
+
+.diagram-canvas {
+    display: block;
+    width: 100%;
+    background-color: #1a1a1a;
+    touch-action: none; /* Prevents default touch behavior for better mobile drawing */
+}
+
+.diagram-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 15px;
+    padding: 10px;
+    background-color: #2a2a2a;
+    border-radius: 8px;
+}
+
+.diagram-control-group {
+    flex: 1;
+    min-width: 200px;
+}
+
+.diagram-control-group h5 {
+    margin-bottom: 10px;
+    color: #F7C35F;
+    font-size: 16px;
+}
+
+.diagram-btn {
+    background-color: #333;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    margin: 5px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+}
+
+.diagram-btn:hover {
+    background-color: #444;
+}
+
+.diagram-btn.active {
+    background-color: #F7C35F;
+    color: #222;
+}
+
+.diagram-info-panel {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    background-color: rgba(20, 20, 20, 0.9);
+    color: white;
+    padding: 10px;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    font-size: 12px;
+    max-width: 300px;
+    pointer-events: none; /* Allows clicks to pass through to canvas */
+}
+
+.diagram-info-panel h5 {
+    margin: 0 0 5px 0;
+    color: #F7C35F;
+    font-size: 14px;
+}
+
+.diagram-info-panel p {
+    margin: 0 0 3px 0;
+}
+
+.diagram-selected-light {
+    border: 2px solid #F7C35F;
+}
+
+/* Light intensity visualization */
+.light-intensity {
+    position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(247, 195, 95, 0.5) 0%, rgba(247, 195, 95, 0.1) 70%, rgba(247, 195, 95, 0) 100%);
+    pointer-events: none; /* Don't interfere with mouse events */
+}
+
+.subject-label {
+    position: absolute;
+    text-align: center;
+    color: white;
+    font-size: 12px;
+    pointer-events: none; /* Don't interfere with mouse events */
+}
+
+/* Form controls for light settings */
+.diagram-form-group {
+    margin-bottom: 10px;
+}
+
+.diagram-label {
+    display: block;
+    margin-bottom: 5px;
+    color: #ccc;
+    font-size: 14px;
+}
+
+.diagram-select, .diagram-input {
+    width: 100%;
+    padding: 6px 8px;
+    border-radius: 4px;
+    background-color: #444;
+    color: white;
+    border: 1px solid #555;
+}
+
+.diagram-select:focus, .diagram-input:focus {
+    outline: none;
+    border-color: #F7C35F;
+}
+
+/* Mobile optimization */
+@media (max-width: 768px) {
+    .diagram-control-group {
+        min-width: 100%;
+    }
+    
+    .diagram-info-panel {
+        left: 10px;
+        right: 10px;
+        max-width: none;
+    }
+}

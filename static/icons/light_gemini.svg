@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="70" viewBox="0 0 100 70">
+  <!-- Main light fixture body -->
+  <rect x="10" y="10" width="80" height="40" rx="5" fill="#BAEAFF" />
+  
+  <!-- Light panel (LED area) -->
+  <rect x="15" y="15" width="70" height="30" rx="3" fill="#FFFFFF" />
+  
+  <!-- LED array pattern -->
+  <g fill="#E0E0E0">
+    <!-- Row 1 -->
+    <circle cx="25" cy="20" r="2" />
+    <circle cx="35" cy="20" r="2" />
+    <circle cx="45" cy="20" r="2" />
+    <circle cx="55" cy="20" r="2" />
+    <circle cx="65" cy="20" r="2" />
+    <circle cx="75" cy="20" r="2" />
+    
+    <!-- Row 2 -->
+    <circle cx="25" cy="30" r="2" />
+    <circle cx="35" cy="30" r="2" />
+    <circle cx="45" cy="30" r="2" />
+    <circle cx="55" cy="30" r="2" />
+    <circle cx="65" cy="30" r="2" />
+    <circle cx="75" cy="30" r="2" />
+    
+    <!-- Row 3 -->
+    <circle cx="25" cy="40" r="2" />
+    <circle cx="35" cy="40" r="2" />
+    <circle cx="45" cy="40" r="2" />
+    <circle cx="55" cy="40" r="2" />
+    <circle cx="65" cy="40" r="2" />
+    <circle cx="75" cy="40" r="2" />
+  </g>
+  
+  <!-- Control section -->
+  <rect x="25" y="50" width="50" height="10" rx="2" fill="#444444" />
+  
+  <!-- Control details -->
+  <circle cx="35" cy="55" r="2" fill="#777777" />
+  <circle cx="45" cy="55" r="2" fill="#777777" />
+  <circle cx="55" cy="55" r="2" fill="#777777" />
+  <circle cx="65" cy="55" r="2" fill="#777777" />
+  
+  <!-- Light stand mount -->
+  <rect x="45" y="60" width="10" height="10" fill="#333333" />
+  
+  <!-- Text label -->
+  <text x="50" y="28" text-anchor="middle" font-family="Arial" font-size="8" fill="#222222">LITEPANELS</text>
+  <text x="50" y="38" text-anchor="middle" font-family="Arial" font-size="7" fill="#222222">GEMINI 2x1</text>
+</svg>

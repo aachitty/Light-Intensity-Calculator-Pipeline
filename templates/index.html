@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Haplon Light Intensity Calculator</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/css/diagram.css" rel="stylesheet">
     <style>
         /* Haplon dark theme */
         :root {
@@ -405,6 +406,19 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Interactive Lighting Diagram Section -->
+        <div id="diagram-section" class="card" style="margin-top: 30px; display: none;">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Interactive Lighting Diagram</h4>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">Drag and position lights around the subject to visualize your lighting setup. Light intensity and distance calculations update in real-time.</p>
+                
+                <!-- Diagram container will be populated by JavaScript -->
+                <div id="diagram-container"></div>
+            </div>
+        </div>
     </div>
     
     <footer class="text-center">
@@ -562,7 +576,56 @@
                     loadingSpinner.style.display = 'none';
                 }
             });
+            
+            // Add a button to show the lighting diagram after calculating
+            resultCard.addEventListener('change', function() {
+                if (resultCard.style.display === 'block') {
+                    // Show the diagram section when results are shown
+                    document.getElementById('diagram-section').style.display = 'block';
+                }
+            });
+            
+            // Show diagram button
+            document.getElementById('result-card').innerHTML += `
+                <div class="mt-4 text-center">
+                    <button id="show-diagram-btn" class="btn btn-primary">
+                        Show Interactive Lighting Diagram
+                    </button>
+                </div>
+            `;
+            
+            // Show diagram when button is clicked
+            document.getElementById('show-diagram-btn').addEventListener('click', function() {
+                const diagramSection = document.getElementById('diagram-section');
+                diagramSection.style.display = 'block';
+                diagramSection.scrollIntoView({ behavior: 'smooth' });
+                
+                // If we just created a light fixture in the calculator, let's add it to the diagram
+                const lightModel = document.getElementById('light-model-selector').value;
+                const modifierType = document.getElementById('modifier-selector').value;
+                const colorTemp = document.getElementById('color-temp-selector').value;
+                const distance = parseFloat(document.getElementById('distance-result').textContent);
+                const intensity = parseFloat(document.getElementById('intensity-result').textContent);
+                
+                if (window.lightingDiagram && window.lightingDiagram.lights.length === 0) {
+                    // Add the light that we just calculated
+                    window.lightingDiagram.addLight(lightModel, CANVAS_WIDTH / 3, CANVAS_HEIGHT / 3);
+                    
+                    // Update the newly added light with our calculated values
+                    const lightIndex = window.lightingDiagram.lights.length - 1;
+                    window.lightingDiagram.lights[lightIndex].diffusion = modifierType;
+                    window.lightingDiagram.lights[lightIndex].colorTemp = colorTemp;
+                    window.lightingDiagram.lights[lightIndex].intensity = intensity;
+                    
+                    // Select this light
+                    window.lightingDiagram.selectedLight = lightIndex;
+                    window.lightingDiagram.draw();
+                }
+            });
         });
     </script>
+    
+    <!-- Interactive Lighting Diagram JavaScript -->
+    <script src="/static/js/diagram.js"></script>
 </body>
 </html>

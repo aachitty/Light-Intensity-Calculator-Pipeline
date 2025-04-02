@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="90" height="60" viewBox="0 0 90 60">
+  <!-- Main light fixture body -->
+  <rect x="15" y="5" width="60" height="35" rx="5" fill="#A9D4FF" />
+  
+  <!-- Light panel (LED area) -->
+  <rect x="20" y="10" width="50" height="25" rx="2" fill="#FFFFFF" />
+  
+  <!-- Controls section -->
+  <rect x="25" y="40" width="40" height="15" rx="3" fill="#444444" />
+  
+  <!-- Control panel details -->
+  <circle cx="35" cy="47" r="3" fill="#777777" />
+  <circle cx="55" cy="47" r="3" fill="#777777" />
+  <rect x="42" y="44" width="6" height="6" fill="#777777" />
+  
+  <!-- Light stand mount -->
+  <rect x="40" y="55" width="10" height="5" fill="#333333" />
+  
+  <!-- Text label -->
+  <text x="45" y="25" text-anchor="middle" font-family="Arial" font-size="8" fill="#222222">ARRI</text>
+  <text x="45" y="35" text-anchor="middle" font-family="Arial" font-size="7" fill="#222222">SKYPANEL S60-C</text>
+</svg>

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80">
+  <!-- Fresnel lens/head -->
+  <circle cx="40" cy="35" r="25" fill="#FFD68A" />
+  <circle cx="40" cy="35" r="22" fill="#FFECCC" />
+  <circle cx="40" cy="35" r="18" fill="#FFD68A" />
+  <circle cx="40" cy="35" r="15" fill="#FFECCC" />
+  <circle cx="40" cy="35" r="10" fill="#FFD68A" />
+  
+  <!-- Light housing -->
+  <rect x="30" y="60" width="20" height="15" rx="2" fill="#555555" />
+  
+  <!-- Light yoke/mount (simplified) -->
+  <path d="M25,35 A15,35 0 0,0 15,35 L15,45 A15,35 0 0,0 25,45 Z" fill="#666666" />
+  <path d="M55,35 A15,35 0 0,1 65,35 L65,45 A15,35 0 0,1 55,45 Z" fill="#666666" />
+  
+  <!-- Control box -->
+  <rect x="25" y="60" width="30" height="10" rx="2" fill="#444444" />
+  
+  <!-- Control details -->
+  <circle cx="35" cy="65" r="2" fill="#777777" />
+  <circle cx="45" cy="65" r="2" fill="#777777" />
+  <rect x="39" y="63" width="2" height="4" fill="#777777" />
+  
+  <!-- Text label -->
+  <text x="40" y="38" text-anchor="middle" font-family="Arial" font-size="5" fill="#222222">APUTURE</text>
+  <text x="40" y="45" text-anchor="middle" font-family="Arial" font-size="5" fill="#222222">LS 300X</text>
+</svg>
