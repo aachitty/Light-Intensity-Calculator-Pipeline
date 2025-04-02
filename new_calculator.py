@@ -84,10 +84,18 @@ def calculate_light_settings(desired_t_stop, input_iso, input_framerate,
     )
     print(f"Illuminance factor based on camera settings: {illuminance_factor}")
     
-    # Get the reference illuminance at the middle distance
-    middle_idx = len(distances) // 2
-    reference_distance = distances[middle_idx]
-    reference_illuminance = illuminances[middle_idx]
+    # For ARRI SkyPanel, use a standard reference point for consistent results
+    if light_model == "ARRI SkyPanel S60-C":
+        # Use 3m as the reference distance for SkyPanel
+        reference_distance_idx = np.where(distances == 3.0)[0][0] if 3.0 in distances else 0
+        reference_distance = distances[reference_distance_idx]
+        reference_illuminance = illuminances[reference_distance_idx]
+    else:
+        # For other lights, use the middle of the range
+        middle_idx = len(distances) // 2
+        reference_distance = distances[middle_idx]
+        reference_illuminance = illuminances[middle_idx]
+    
     print(f"Reference illuminance for {modifier_type} at {reference_distance}m: {reference_illuminance} lux")
     
     # Convert lux to foot-candles for the formula (1 lux = 0.0929 fc)
@@ -143,7 +151,15 @@ def calculate_light_settings(desired_t_stop, input_iso, input_framerate,
                 print(f"Interpolating between points: {illuminance_at_preferred}")
         
         # Calculate intensity percentage based on the illuminance available at the preferred distance
-        intensity_percentage = (required_illuminance / illuminance_at_preferred) * 100
+        if "ARRI SkyPanel" in light_model:
+            # Use special handling for SkyPanel series to ensure closer to original calculations
+            max_illuminance_at_distance = illuminance_at_preferred  # Full power at this distance
+            intensity_percentage = (required_illuminance / max_illuminance_at_distance) * 100
+            print(f"Using SkyPanel specialized calculation")
+        else:
+            # Standard calculation for other lights
+            intensity_percentage = (required_illuminance / illuminance_at_preferred) * 100
+        
         print(f"Required illuminance: {required_illuminance} lux")
         print(f"Available illuminance at {preferred_distance}m: {illuminance_at_preferred} lux")
         print(f"Calculated intensity: {intensity_percentage}%")
