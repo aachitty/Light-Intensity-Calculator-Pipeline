@@ -489,23 +489,30 @@ class LightingDiagram {
         // Calculate the distance in meters from the subject
         const distance = this.calculateDistance(light);
         
-        // Based on the distance, calculate the required intensity
-        // This is a simplified approximation - in a real implementation,
-        // you would use the physics calculation from the main calculator
+        // We want to determine what intensity would be needed to maintain proper exposure
+        // at the current distance
+        
+        // Reference values matching the main calculator
+        const referenceDistance = 3.0; // meters - middle value from our dataset
         
         // Inverse square law: illuminance ∝ 1/distance²
-        // We'll use a reference distance of 1m and intensity of 100%
-        const referenceDistance = 3; // meters
-        const referenceIntensity = 100; // percent
+        // At further distances, we need more intensity
+        // So intensity should increase with distance, not decrease
         
-        // Calculate intensity based on distance (inverse square law)
-        let intensity = referenceIntensity * Math.pow(referenceDistance / distance, 2);
+        // Calculate distance ratio squared
+        let distanceRatioSquared = Math.pow(distance / referenceDistance, 2);
+        
+        // Calculate intensity based on distance
+        // As distance increases, intensity needs to increase
+        let intensity = distanceRatioSquared * 100;
         
         // Cap intensity to 100%
         intensity = Math.min(100, intensity);
         
         // Set the calculated intensity
         light.intensity = Math.round(intensity * 100) / 100; // Round to 2 decimal places
+        
+        console.log(`Light at ${distance.toFixed(2)}m requires ${intensity.toFixed(2)}% intensity`);
         
         // Update light info display
         this.draw();
@@ -629,9 +636,17 @@ class LightingDiagram {
         // Calculate the distance in meters
         const distance = this.calculateDistance(light);
         
-        // Scale the intensity indicator based on light's intensity and distance
-        const maxRadius = 200;
-        const radius = Math.sqrt(light.intensity) * maxRadius / distance; // Scale for distance
+        // For visualization purposes, use the inverse square law to calculate
+        // the radius of the light effect based on intensity and distance
+        // 
+        // Higher intensity and shorter distance should result in a larger light radius
+        // on the subject, which is actually the opposite of our light intensity calculation
+        // (where we need more intensity at greater distances)
+        
+        // Base the radius on how much light would reach the subject
+        const maxRadius = 250;
+        // Scale radius based on intensity and inverse of distance
+        const radius = Math.sqrt(light.intensity / 100) * maxRadius / Math.sqrt(distance);
         
         // Draw intensity circle
         this.ctx.beginPath();
@@ -658,12 +673,21 @@ class LightingDiagram {
         
         // Create gradient based on light type
         const gradient = this.ctx.createRadialGradient(light.x, light.y, 0, light.x, light.y, radius);
-        gradient.addColorStop(0, `rgba(${baseColor}, 0.6)`);
-        gradient.addColorStop(0.7, `rgba(${baseColor}, 0.1)`);
+        gradient.addColorStop(0, `rgba(${baseColor}, 0.7)`);
+        gradient.addColorStop(0.5, `rgba(${baseColor}, 0.3)`);
+        gradient.addColorStop(0.8, `rgba(${baseColor}, 0.1)`);
         gradient.addColorStop(1, `rgba(${baseColor}, 0)`);
         
         this.ctx.fillStyle = gradient;
         this.ctx.fill();
+        
+        // Draw a line from the light to the subject to help visualize the connection
+        this.ctx.beginPath();
+        this.ctx.moveTo(light.x, light.y);
+        this.ctx.lineTo(SUBJECT.x, SUBJECT.y);
+        this.ctx.strokeStyle = `rgba(${baseColor}, 0.3)`;
+        this.ctx.lineWidth = 1;
+        this.ctx.stroke();
     }
     
     drawLight(light, index) {
