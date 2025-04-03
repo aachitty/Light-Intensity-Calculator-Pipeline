@@ -490,10 +490,20 @@ class LightingDiagram {
         const distance = this.calculateDistance(light);
         
         // We want to determine what intensity would be needed to maintain proper exposure
-        // at the current distance
+        // at the current distance with the current camera settings
         
         // Reference values matching the main calculator
         const referenceDistance = 3.0; // meters - middle value from our dataset
+        
+        // Calculate an exposure factor based on camera settings
+        // Using the cinematography formula: FC = 25f²/(exp*ISO)
+        const isoFactor = this.cameraSettings.iso / 800; // 800 ISO as reference
+        const tStopFactor = Math.pow(this.cameraSettings.tStop / 2.8, 2); // T2.8 as reference
+        const framerateFactor = this.cameraSettings.framerate <= 30 ? 1 : (this.cameraSettings.framerate / 30); // 24-30fps as reference
+        
+        // Combined exposure setting factor - higher values need more light
+        // Lower ISO needs more light, higher T-stop needs more light, higher framerate needs more light
+        const exposureFactor = tStopFactor / (isoFactor * framerateFactor);
         
         // Special case: Aputure MC is a small on-camera light with different characteristics
         // It has much shorter optimal distances (0.5m-2m instead of 3m-9m)
@@ -504,8 +514,9 @@ class LightingDiagram {
             // Calculate distance ratio squared
             let distanceRatioSquared = Math.pow(distance / mcReferenceDistance, 2);
             
-            // Calculate intensity based on distance
-            let intensity = distanceRatioSquared * 100;
+            // Calculate intensity based on distance and exposure factor
+            // Higher exposure factor = need more intensity
+            let intensity = distanceRatioSquared * 100 * exposureFactor;
             
             // Adjust the falloff curve to be more dramatic for this small light
             // When very close (<0.5m), lower intensity significantly
@@ -519,7 +530,7 @@ class LightingDiagram {
             // Set the calculated intensity
             light.intensity = Math.round(intensity * 100) / 100; // Round to 2 decimal places
             
-            console.log(`Aputure MC at ${distance.toFixed(2)}m requires ${intensity.toFixed(2)}% intensity`);
+            console.log(`Aputure MC at ${distance.toFixed(2)}m requires ${intensity.toFixed(2)}% intensity (ISO: ${this.cameraSettings.iso}, T-stop: ${this.cameraSettings.tStop}, FPS: ${this.cameraSettings.framerate})`);
         } else {
             // Standard lights (SkyPanel, LS 300X, Gemini)
             
@@ -530,9 +541,10 @@ class LightingDiagram {
             // Calculate distance ratio squared
             let distanceRatioSquared = Math.pow(distance / referenceDistance, 2);
             
-            // Calculate intensity based on distance
+            // Calculate intensity based on distance and exposure factor
             // As distance increases, intensity needs to increase
-            let intensity = distanceRatioSquared * 100;
+            // As exposure needs increase (higher T-stop, lower ISO), intensity needs to increase
+            let intensity = distanceRatioSquared * 100 * exposureFactor;
             
             // Cap intensity to 100%
             intensity = Math.min(100, intensity);
@@ -540,7 +552,7 @@ class LightingDiagram {
             // Set the calculated intensity
             light.intensity = Math.round(intensity * 100) / 100; // Round to 2 decimal places
             
-            console.log(`Light at ${distance.toFixed(2)}m requires ${intensity.toFixed(2)}% intensity`);
+            console.log(`Light at ${distance.toFixed(2)}m requires ${intensity.toFixed(2)}% intensity (ISO: ${this.cameraSettings.iso}, T-stop: ${this.cameraSettings.tStop}, FPS: ${this.cameraSettings.framerate})`);
         }
         
         // Update light info display
@@ -830,14 +842,37 @@ class LightingDiagram {
     }
     
     drawInfoPanel() {
+        // Draw camera settings panel at the top left
+        this.ctx.fillStyle = 'rgba(20, 20, 20, 0.9)';
+        this.ctx.strokeStyle = '#F7C35F';
+        this.ctx.lineWidth = 1;
+        
+        const cameraX = 10;
+        const cameraY = 10;
+        const cameraWidth = 180;
+        const cameraHeight = 60;
+        
+        // Camera panel background
+        this.ctx.fillRect(cameraX, cameraY, cameraWidth, cameraHeight);
+        this.ctx.strokeRect(cameraX, cameraY, cameraWidth, cameraHeight);
+        
+        // Camera panel title
+        this.ctx.font = 'bold 12px Arial';
+        this.ctx.fillStyle = '#F7C35F';
+        this.ctx.textAlign = 'left';
+        this.ctx.fillText(`Camera Settings`, cameraX + 10, cameraY + 20);
+        
+        // Camera settings info
+        this.ctx.font = '12px Arial';
+        this.ctx.fillStyle = 'white';
+        this.ctx.fillText(`T-Stop: ${this.cameraSettings.tStop}`, cameraX + 10, cameraY + 35);
+        this.ctx.fillText(`ISO: ${this.cameraSettings.iso}`, cameraX + 10, cameraY + 50);
+        this.ctx.fillText(`FPS: ${this.cameraSettings.framerate}`, cameraX + 100, cameraY + 50);
+        
+        // Draw selected light info panel at the bottom right
         if (this.selectedLight !== null) {
             const light = this.lights[this.selectedLight];
             const distance = this.calculateDistance(light).toFixed(1);
-            
-            // Draw info panel at the bottom right
-            this.ctx.fillStyle = 'rgba(20, 20, 20, 0.9)';
-            this.ctx.strokeStyle = '#F7C35F';
-            this.ctx.lineWidth = 1;
             
             const panelX = this.canvas.width - 210;
             const panelY = this.canvas.height - 100;
@@ -845,6 +880,9 @@ class LightingDiagram {
             const panelHeight = 90;
             
             // Panel background
+            this.ctx.fillStyle = 'rgba(20, 20, 20, 0.9)';
+            this.ctx.strokeStyle = '#F7C35F';
+            this.ctx.lineWidth = 1;
             this.ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
             this.ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
             

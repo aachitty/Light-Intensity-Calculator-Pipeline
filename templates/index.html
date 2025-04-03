@@ -441,6 +441,25 @@
                 }
             });
             
+            // Initialize the diagram with the current camera settings when the page loads
+            setTimeout(() => {
+                // Get initial camera settings
+                const initialTStop = parseFloat(tStopSelector.value === 'custom' ? 
+                    document.getElementById('custom-t-stop').value : tStopSelector.value);
+                const initialIso = parseInt(document.getElementById('iso-input').value);
+                const initialFramerate = parseInt(document.getElementById('framerate-input').value);
+                
+                // Update diagram settings if the function exists and the diagram is loaded
+                if (typeof updateCameraSettings === 'function' && window.lightingDiagram) {
+                    updateCameraSettings(initialTStop, initialIso, initialFramerate);
+                    console.log('Initialized diagram with camera settings:', {
+                        t_stop: initialTStop,
+                        iso: initialIso,
+                        framerate: initialFramerate
+                    });
+                }
+            }, 1000); // Wait for the diagram to be fully initialized
+            
             // Show/hide distance and intensity sliders based on calculation mode
             const calcModeRadios = document.querySelectorAll('input[name="calc-mode"]');
             const distanceInputGroup = document.getElementById('distance-input-group');
@@ -548,6 +567,16 @@
                     document.getElementById('intensity-result').textContent = `${data.intensity}%`;
                     document.getElementById('distance-result-text').textContent = `${data.distance} meters`;
                     document.getElementById('intensity-result-text').textContent = `${data.intensity}%`;
+                    
+                    // Update the diagram with the current camera settings
+                    if (data.camera_settings && typeof updateCameraSettings === 'function') {
+                        updateCameraSettings(
+                            data.camera_settings.t_stop,
+                            data.camera_settings.iso,
+                            data.camera_settings.framerate
+                        );
+                        console.log('Updated diagram camera settings:', data.camera_settings);
+                    }
                     
                     // Update interpretation text
                     document.getElementById('t-stop-result').textContent = tStop;

@@ -541,7 +541,12 @@ def calculate():
             'exposure_warning': exposure_warning,
             'calculation_mode_text': calculation_mode_text,
             'modifier_type': modifier_type,
-            'light_model': light_model
+            'light_model': light_model,
+            'camera_settings': {
+                't_stop': t_stop,
+                'iso': iso,
+                'framerate': framerate
+            }
         }
         
         # Add warning messages based on exposure_warning flag
