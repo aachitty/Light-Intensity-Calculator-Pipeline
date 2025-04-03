@@ -497,13 +497,17 @@ class LightingDiagram {
         
         // Calculate an exposure factor based on camera settings
         // Using the cinematography formula: FC = 25f²/(exp*ISO)
-        const isoFactor = this.cameraSettings.iso / 800; // 800 ISO as reference
-        const tStopFactor = Math.pow(this.cameraSettings.tStop / 2.8, 2); // T2.8 as reference
+        // ISO is inversely proportional - higher ISO needs less light
+        const isoFactor = 800 / this.cameraSettings.iso; // 800 ISO as reference (inverse because higher ISO = less light needed)
+        const tStopFactor = Math.pow(this.cameraSettings.tStop / 2.8, 2); // T2.8 as reference (squared because f² in formula)
         const framerateFactor = this.cameraSettings.framerate <= 30 ? 1 : (this.cameraSettings.framerate / 30); // 24-30fps as reference
         
         // Combined exposure setting factor - higher values need more light
-        // Lower ISO needs more light, higher T-stop needs more light, higher framerate needs more light
-        const exposureFactor = tStopFactor / (isoFactor * framerateFactor);
+        // Higher exposure factor = need more intensity
+        // - Higher T-stop (smaller aperture) needs more light (tStopFactor increases)
+        // - Lower ISO needs more light (isoFactor increases when ISO decreases)
+        // - Higher framerate needs more light (framerateFactor increases)
+        const exposureFactor = tStopFactor * isoFactor * framerateFactor;
         
         // Special case: Aputure MC is a small on-camera light with different characteristics
         // It has much shorter optimal distances (0.5m-2m instead of 3m-9m)
