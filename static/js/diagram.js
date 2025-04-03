@@ -521,8 +521,13 @@ class LightingDiagram {
                 // Distance ratio squared (inverse square law)
                 const skyPanelDistanceRatio = Math.pow(distance / skyPanelReferenceDistance, 2);
                 
+                // Adjust the base output based on the diffusion type
+                // Standard is our reference (100%), other diffusions adjust accordingly
+                const diffusionFactor = skyPanelReferenceLux / 1305; // Normalize to Standard diffusion
+                
                 // Calculate intensity needed
-                intensity = skyPanelDistanceRatio * 100 * exposureFactor;
+                // Higher lux reference means we need less intensity to achieve the same result
+                intensity = skyPanelDistanceRatio * 100 * exposureFactor / diffusionFactor;
                 
                 console.log(`SkyPanel at ${distance.toFixed(2)}m with ${light.diffusion} diffusion requires ${intensity.toFixed(2)}% intensity (ISO: ${this.cameraSettings.iso}, T-stop: ${this.cameraSettings.tStop}, FPS: ${this.cameraSettings.framerate})`);
                 break;
@@ -538,9 +543,14 @@ class LightingDiagram {
                                           
                 // Calculate intensity with falloff
                 const ls300xDistanceRatio = Math.pow(distance / ls300xReferenceDistance, 2);
-                intensity = ls300xDistanceRatio * 100 * exposureFactor;
                 
-                // For narrow beam angles, increase the intensity for longer distances
+                // Adjust for the diffusion type - Standard Reflector (4400 lux) is our reference
+                const ls300xDiffusionFactor = ls300xReferenceLux / 4400; // Normalize to Standard Reflector
+                
+                // Calculate intensity needed with real photometric data
+                intensity = ls300xDistanceRatio * 100 * exposureFactor / ls300xDiffusionFactor;
+                
+                // For narrow beam angles, intensity falloff at very long distances due to beam angle
                 if (light.diffusion === "15° Hyper-Reflector" && distance > 5) {
                     intensity = intensity * 0.85; // Slight reduction in effectiveness at very long distances
                 }
@@ -557,7 +567,12 @@ class LightingDiagram {
                                           
                 // Calculate intensity with falloff
                 const geminiDistanceRatio = Math.pow(distance / geminiReferenceDistance, 2);
-                intensity = geminiDistanceRatio * 100 * exposureFactor;
+                
+                // Adjust for the diffusion type - Raw (1100 lux) is our reference
+                const geminiDiffusionFactor = geminiReferenceLux / 1100; // Normalize to Raw
+                
+                // Calculate intensity needed with real photometric data
+                intensity = geminiDistanceRatio * 100 * exposureFactor / geminiDiffusionFactor;
                 
                 console.log(`Gemini 2x1 at ${distance.toFixed(2)}m with ${light.diffusion} requires ${intensity.toFixed(2)}% intensity (ISO: ${this.cameraSettings.iso}, T-stop: ${this.cameraSettings.tStop}, FPS: ${this.cameraSettings.framerate})`);
                 break;
@@ -573,7 +588,11 @@ class LightingDiagram {
                 
                 // Calculate intensity based on distance and exposure factor
                 // Higher exposure factor = need more intensity
-                intensity = mcDistanceRatio * 100 * exposureFactor;
+                // mcReferenceLux is much lower (100) compared to larger fixtures (1000+)
+                // which means we need to compensate by multiplying the intensity
+                // Normalize against a common reference (1305 lux of SkyPanel Standard)
+                const mcOutputFactor = 1305 / mcReferenceLux; // ~13x multiplier to match output of larger fixtures
+                intensity = mcDistanceRatio * 100 * exposureFactor * mcOutputFactor;
                 
                 // Adjust the falloff curve to be more dramatic for this small light
                 if (distance < 0.5) {
