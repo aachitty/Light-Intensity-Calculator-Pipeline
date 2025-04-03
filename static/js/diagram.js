@@ -115,25 +115,25 @@ const LIGHT_MODIFIERS = {
         // Photometric data (lux at 3m)
         photometricData: {
             "No Diffusion": {
-                "3200K": 2780,
-                "5600K": 2650
+                "3200K": 3310,  // Different from LS 300X and SkyPanel for accuracy
+                "5600K": 3190
             },
             "Light Diffusion": {
-                "3200K": 2222,
-                "5600K": 2120
+                "3200K": 2650,
+                "5600K": 2550
             },
             "Medium Diffusion": {
-                "3200K": 1666,
-                "5600K": 1590
+                "3200K": 1860,
+                "5600K": 1790
             },
             "Heavy Diffusion": {
-                "3200K": 1111,
-                "5600K": 1060
+                "3200K": 1305,
+                "5600K": 1250
             }
         },
         referenceDistance: 3.0, // Meters
-        beamAngle: 95, // Degrees
-        effectiveRange: [1.5, 8.0] // Effective distance range in meters
+        beamAngle: 110, // Degrees - wider than the LS 300X, slightly narrower than SkyPanel
+        effectiveRange: [1.5, 7.5] // Effective distance range in meters
     },
     "Aputure MC": {
         modifiers: ["No Diffusion", "With Diffusion"],
@@ -624,11 +624,11 @@ class LightingDiagram {
         // Get the reference output to normalize against
         // This is typically the highest output configuration of each light
         const referenceOutput = light.type === "ARRI SkyPanel S60-C" ? 
-                               lightData.photometricData["Intensifier"]["3200K"] : 
+                               lightData.photometricData["Intensifier"]["3200K"] : // 2011 lux
                              light.type === "Aputure LS 300X" ? 
-                               lightData.photometricData["15° Beam"]["5600K"] : 
+                               lightData.photometricData["15° Beam"]["5600K"] : // 4400 lux
                              light.type === "Litepanels Gemini 2x1" ? 
-                               lightData.photometricData["No Diffusion"]["3200K"] : 
+                               lightData.photometricData["No Diffusion"]["3200K"] : // 3310 lux (updated value)
                              light.type === "Aputure MC" ? 
                                lightData.photometricData["No Diffusion"]["3200K"] * 13.05 : // Scale factor to match larger lights
                                referenceLux;
