@@ -56,27 +56,103 @@ const LIGHT_ICONS = {
     `
 };
 
-// Define light-specific modifiers and color temps based on backend data
+// Define light-specific modifiers and color temps based on precise photometric data
 const LIGHT_MODIFIERS = {
     "ARRI SkyPanel S60-C": {
         modifiers: ["Standard", "Lite", "Heavy", "Intensifier"],
         colorTemps: ["3200K", "5600K"],
-        defaultModifier: "Standard"
+        defaultModifier: "Standard",
+        // Real photometric data (lux at 3m) from ARRI documentation
+        photometricData: {
+            "Standard": {
+                "3200K": 1305,
+                "5600K": 1200
+            },
+            "Lite": {
+                "3200K": 1328,
+                "5600K": 1220
+            },
+            "Heavy": {
+                "3200K": 1031,
+                "5600K": 955
+            },
+            "Intensifier": {
+                "3200K": 2011,
+                "5600K": 1845
+            }
+        },
+        referenceDistance: 3.0, // Meters
+        beamAngle: 115, // Degrees - wide soft source
+        effectiveRange: [1.5, 9.0] // Effective distance range in meters
     },
     "Aputure LS 300X": {
         modifiers: ["15° Beam", "30° Beam", "45° Beam", "60° Beam"],
         colorTemps: ["5600K"],
-        defaultModifier: "15° Beam"
+        defaultModifier: "15° Beam",
+        // Photometric data based on beam angle (lux at 3m)
+        photometricData: {
+            "15° Beam": {
+                "5600K": 4400
+            },
+            "30° Beam": {
+                "5600K": 2110
+            },
+            "45° Beam": {
+                "5600K": 1166
+            },
+            "60° Beam": {
+                "5600K": 644
+            }
+        },
+        referenceDistance: 3.0, // Meters
+        // Beam angles are in the modifier names
+        effectiveRange: [1.5, 12.0] // Greater throw distance for focused beams
     },
     "Litepanels Gemini 2x1": {
         modifiers: ["No Diffusion", "Light Diffusion", "Medium Diffusion", "Heavy Diffusion"],
         colorTemps: ["3200K", "5600K"],
-        defaultModifier: "No Diffusion"
+        defaultModifier: "No Diffusion",
+        // Photometric data (lux at 3m)
+        photometricData: {
+            "No Diffusion": {
+                "3200K": 2780,
+                "5600K": 2650
+            },
+            "Light Diffusion": {
+                "3200K": 2222,
+                "5600K": 2120
+            },
+            "Medium Diffusion": {
+                "3200K": 1666,
+                "5600K": 1590
+            },
+            "Heavy Diffusion": {
+                "3200K": 1111,
+                "5600K": 1060
+            }
+        },
+        referenceDistance: 3.0, // Meters
+        beamAngle: 95, // Degrees
+        effectiveRange: [1.5, 8.0] // Effective distance range in meters
     },
     "Aputure MC": {
         modifiers: ["No Diffusion", "With Diffusion"],
         colorTemps: ["3200K", "5600K"],
-        defaultModifier: "No Diffusion"
+        defaultModifier: "No Diffusion",
+        // Photometric data (lux at 1m) - much smaller values due to size
+        photometricData: {
+            "No Diffusion": {
+                "3200K": 100,
+                "5600K": 95
+            },
+            "With Diffusion": {
+                "3200K": 80,
+                "5600K": 76
+            }
+        },
+        referenceDistance: 1.0, // Meters - smaller reference distance due to lower output
+        beamAngle: 120, // Degrees - wide spread but weak
+        effectiveRange: [0.3, 2.0] // Limited effective range due to small size
     }
 };
 
@@ -510,6 +586,7 @@ class LightingDiagram {
         if (lightIndex === null || lightIndex >= this.lights.length) return;
         
         const light = this.lights[lightIndex];
+        const lightData = LIGHT_MODIFIERS[light.type];
         
         // Calculate the distance in meters from the subject
         const distance = this.calculateDistance(light);
@@ -528,124 +605,131 @@ class LightingDiagram {
         // - Higher framerate needs more light (framerateFactor increases)
         const exposureFactor = tStopFactor * isoFactor * framerateFactor;
         
-        // Get light-specific photometric data based on the light type
-        // Real-world data for each light fixture
-        let intensity;
+        // Get the reference lux value from our photometric data
+        const referenceLux = lightData.photometricData[light.diffusion]?.[light.colorTemp] || 
+                           // Fallback if exact combo not found
+                           lightData.photometricData[light.diffusion]?.[lightData.colorTemps[0]] || 
+                           lightData.photometricData[lightData.defaultModifier]?.[light.colorTemp] || 
+                           lightData.photometricData[lightData.defaultModifier][lightData.colorTemps[0]];
         
+        const referenceDistance = lightData.referenceDistance;
+        const effectiveRange = lightData.effectiveRange;
+        
+        // Determine if the light is in its effective range
+        const inEffectiveRange = distance >= effectiveRange[0] && distance <= effectiveRange[1];
+        
+        // Calculate the base intensity using inverse square law
+        const distanceRatio = Math.pow(distance / referenceDistance, 2);
+        
+        // Get the reference output to normalize against
+        // This is typically the highest output configuration of each light
+        const referenceOutput = light.type === "ARRI SkyPanel S60-C" ? 
+                               lightData.photometricData["Intensifier"]["3200K"] : 
+                             light.type === "Aputure LS 300X" ? 
+                               lightData.photometricData["15° Beam"]["5600K"] : 
+                             light.type === "Litepanels Gemini 2x1" ? 
+                               lightData.photometricData["No Diffusion"]["3200K"] : 
+                             light.type === "Aputure MC" ? 
+                               lightData.photometricData["No Diffusion"]["3200K"] * 13.05 : // Scale factor to match larger lights
+                               referenceLux;
+        
+        // Output multiplier - how much more/less intense we need to be vs. reference
+        // Lower reference lux means we need MORE intensity to achieve the same result
+        const outputFactor = referenceOutput / referenceLux;
+        
+        // Calculate the base intensity
+        let intensity = distanceRatio * 100 * exposureFactor * outputFactor;
+        
+        // Apply light-specific adjustments
         switch (light.type) {
-            case "ARRI SkyPanel S60-C":
-                // SkyPanel S60-C has highest output at 3m with Standard diffusion: 1305 lux
-                // Using the product's real photometric data
-                const skyPanelReferenceDistance = 3.0; // meters
-                const skyPanelReferenceLux = light.diffusion === "Intensifier" ? 2011 : 
-                                            light.diffusion === "Standard" ? 1305 : 
-                                            light.diffusion === "Lite" ? 1328 : 
-                                            light.diffusion === "Heavy" ? 1031 : 1305;
-                
-                // Distance ratio squared (inverse square law)
-                const skyPanelDistanceRatio = Math.pow(distance / skyPanelReferenceDistance, 2);
-                
-                // Adjust the base output based on the diffusion type
-                // Standard is our reference (100%), other diffusions adjust accordingly
-                const diffusionFactor = skyPanelReferenceLux / 1305; // Normalize to Standard diffusion
-                
-                // Calculate intensity needed
-                // Higher lux reference means we need less intensity to achieve the same result
-                intensity = skyPanelDistanceRatio * 100 * exposureFactor / diffusionFactor;
-                
-                console.log(`SkyPanel at ${distance.toFixed(2)}m with ${light.diffusion} diffusion requires ${intensity.toFixed(2)}% intensity (ISO: ${this.cameraSettings.iso}, T-stop: ${this.cameraSettings.tStop}, FPS: ${this.cameraSettings.framerate})`);
-                break;
-                
             case "Aputure LS 300X":
-                // Aputure LS 300X has different characteristics from SkyPanel
-                // Higher output but narrower beam angle
-                const ls300xReferenceDistance = 3.0; // meters
-                const ls300xReferenceLux = light.diffusion === "15° Beam" ? 4400 :
-                                          light.diffusion === "30° Beam" ? 2110 :
-                                          light.diffusion === "45° Beam" ? 1166 :
-                                          light.diffusion === "60° Beam" ? 644 : 4400;
-                                          
-                // Calculate intensity with falloff
-                const ls300xDistanceRatio = Math.pow(distance / ls300xReferenceDistance, 2);
-                
-                // Adjust for the diffusion type - 15° Beam (4400 lux) is our reference
-                const ls300xDiffusionFactor = ls300xReferenceLux / 4400; // Normalize to 15° Beam
-                
-                // Calculate intensity needed with real photometric data
-                intensity = ls300xDistanceRatio * 100 * exposureFactor / ls300xDiffusionFactor;
-                
-                // For narrow beam angles, intensity falloff at very long distances due to beam angle
-                if (light.diffusion === "15° Beam" && distance > 5) {
-                    intensity = intensity * 0.85; // Slight reduction in effectiveness at very long distances
+                // Focused beams behave differently at long distances
+                // Narrow beam angles maintain intensity better at distance but fall off more rapidly at edges
+                if (light.diffusion === "15° Beam") {
+                    if (distance > 6) {
+                        // At very long distances, narrow beams lose some efficiency
+                        intensity = intensity * (1 - (distance - 6) * 0.05);
+                    }
+                } else if (light.diffusion === "30° Beam") {
+                    if (distance > 8) {
+                        intensity = intensity * (1 - (distance - 8) * 0.03);
+                    }
                 }
                 
-                console.log(`Aputure LS 300X at ${distance.toFixed(2)}m with ${light.diffusion} requires ${intensity.toFixed(2)}% intensity (ISO: ${this.cameraSettings.iso}, T-stop: ${this.cameraSettings.tStop}, FPS: ${this.cameraSettings.framerate})`);
-                break;
-                
-            case "Litepanels Gemini 2x1":
-                // Gemini 2x1 has moderate output with wide, soft light pattern
-                const geminiReferenceDistance = 3.0; // meters
-                const geminiReferenceLux = light.diffusion === "No Diffusion" ? 2780 :
-                                         light.diffusion === "Light Diffusion" ? 2222 :
-                                         light.diffusion === "Medium Diffusion" ? 1666 :
-                                         light.diffusion === "Heavy Diffusion" ? 1111 : 2780;
-                                          
-                // Calculate intensity with falloff
-                const geminiDistanceRatio = Math.pow(distance / geminiReferenceDistance, 2);
-                
-                // Adjust for the diffusion type - "No Diffusion" (2780 lux) is our reference
-                const geminiDiffusionFactor = geminiReferenceLux / 2780; // Normalize to No Diffusion
-                
-                // Calculate intensity needed with real photometric data
-                intensity = geminiDistanceRatio * 100 * exposureFactor / geminiDiffusionFactor;
-                
-                console.log(`Gemini 2x1 at ${distance.toFixed(2)}m with ${light.diffusion} requires ${intensity.toFixed(2)}% intensity (ISO: ${this.cameraSettings.iso}, T-stop: ${this.cameraSettings.tStop}, FPS: ${this.cameraSettings.framerate})`);
+                // Apply a small boost to intensity when in optimal range
+                if (distance >= 2.5 && distance <= 8) {
+                    intensity = intensity * 0.95; // Slight efficiency boost within optimal range
+                }
                 break;
                 
             case "Aputure MC":
-                // Aputure MC is a small on-camera light with different characteristics
-                // It has much shorter optimal distances (0.5m-2m instead of 3m-9m)
-                const mcReferenceDistance = 1.0; // 1 meter is more appropriate for this light
-                const mcReferenceLux = light.diffusion === "No Diffusion" ? 100 : 
-                                      light.diffusion === "With Diffusion" ? 80 : 100; // Much lower output than the larger fixtures
-                
-                // Calculate distance ratio squared
-                let mcDistanceRatio = Math.pow(distance / mcReferenceDistance, 2);
-                
-                // Calculate intensity based on distance and exposure factor
-                // Higher exposure factor = need more intensity
-                // mcReferenceLux is much lower (100) compared to larger fixtures (1000+)
-                // which means we need to compensate by multiplying the intensity
-                // Normalize against a common reference (1305 lux of SkyPanel Standard)
-                const mcOutputFactor = 1305 / mcReferenceLux; // ~13x multiplier to match output of larger fixtures
-                intensity = mcDistanceRatio * 100 * exposureFactor * mcOutputFactor;
-                
-                // Adjust the falloff curve to be more dramatic for this small light
+                // The MC is effective only at very short distances
                 if (distance < 0.5) {
-                    intensity = intensity * (distance / 0.5); // Reduce intensity when very close
+                    // Very close proximity modulation - reduced intensity when too close
+                    intensity = intensity * (distance / 0.5);
                 } else if (distance > 2.0) {
-                    // The MC's output falls off more rapidly at longer distances due to its size
-                    intensity = intensity * (1 + (distance - 2.0) * 0.3); // Increase intensity more rapidly beyond 2m
+                    // Rapid falloff beyond effective range
+                    // More aggressive correction for this small light
+                    intensity = intensity * (1 + Math.pow(distance - 2.0, 1.5) * 0.4);
                 }
-                
-                console.log(`Aputure MC at ${distance.toFixed(2)}m requires ${intensity.toFixed(2)}% intensity (ISO: ${this.cameraSettings.iso}, T-stop: ${this.cameraSettings.tStop}, FPS: ${this.cameraSettings.framerate})`);
                 break;
                 
-            default:
-                // Generic calculation for any other light type
-                const genericReferenceDistance = 3.0;
-                const genericDistanceRatio = Math.pow(distance / genericReferenceDistance, 2);
-                intensity = genericDistanceRatio * 100 * exposureFactor;
-                console.log(`Generic light at ${distance.toFixed(2)}m requires ${intensity.toFixed(2)}% intensity (ISO: ${this.cameraSettings.iso}, T-stop: ${this.cameraSettings.tStop}, FPS: ${this.cameraSettings.framerate})`);
+            case "ARRI SkyPanel S60-C":
+                // SkyPanel maintains better efficiency at mid-distances
+                if (distance > 1.5 && distance < 6) {
+                    intensity = intensity * 0.97; // Slight efficiency boost
+                }
+                
+                // Color temperature adjustment - 5600K is slightly less efficient
+                if (light.colorTemp === "5600K") {
+                    intensity = intensity * 1.05; // Needs 5% more power for equivalent output
+                }
+                break;
+                
+            case "Litepanels Gemini 2x1":
+                // Gemini has slightly more directionality than SkyPanel
+                if (distance > 2 && distance < 5) {
+                    intensity = intensity * 0.98; // Slight efficiency boost in optimal range
+                }
+                break;
         }
         
-        // Cap intensity to 100%
-        intensity = Math.min(100, intensity);
+        // Apply warning flags or outright cap if beyond effective range
+        let exposureWarning = false;
+        let outOfRangeMessage = "";
         
-        // Set the calculated intensity
-        light.intensity = Math.round(intensity * 100) / 100; // Round to 2 decimal places
+        if (!inEffectiveRange) {
+            if (distance < effectiveRange[0]) {
+                outOfRangeMessage = `Too close (min: ${effectiveRange[0]}m)`;
+                // If too close, reduce intensity to prevent overexposure artifacts
+                intensity = intensity * 0.8;
+            } else if (distance > effectiveRange[1]) {
+                outOfRangeMessage = `Too far (max: ${effectiveRange[1]}m)`;
+                // If too far, apply additional penalty beyond inverse square
+                intensity = intensity * 1.2;
+            }
+            exposureWarning = true;
+        }
         
-        // Update light info display
+        // Cap intensity at 100%
+        const isTooIntense = intensity > 100;
+        if (isTooIntense) {
+            exposureWarning = true;
+            intensity = 100;
+        }
+        
+        // Set the warning message
+        light.exposureWarning = exposureWarning;
+        light.warningMessage = isTooIntense ? "Max intensity reached" : outOfRangeMessage;
+        
+        // Set the calculated intensity (rounded to 2 decimal places)
+        light.intensity = Math.round(intensity * 100) / 100;
+        
+        // Log for debugging
+        console.log(`${light.type} at ${distance.toFixed(2)}m with ${light.diffusion} (${light.colorTemp}) requires ${light.intensity.toFixed(2)}% intensity (ISO: ${this.cameraSettings.iso}, T-stop: ${this.cameraSettings.tStop}, FPS: ${this.cameraSettings.framerate})`);
+        if (exposureWarning) console.log(`WARNING: ${outOfRangeMessage || "Max intensity reached"}`);
+        
+        // Update display
         this.draw();
     }
     
@@ -788,98 +872,227 @@ class LightingDiagram {
         
         // Calculate the distance in meters
         const distance = this.calculateDistance(light);
+        const lightData = LIGHT_MODIFIERS[light.type];
         
         // For visualization purposes, use the inverse square law to calculate
         // the radius of the light effect based on intensity and distance
-        // 
-        // Higher intensity and shorter distance should result in a larger light radius
-        // on the subject, which is actually the opposite of our light intensity calculation
-        // (where we need more intensity at greater distances)
         
         // Determine color and set parameters based on light type
         let baseColor;
         let maxRadius = 250;
         let radiusScaleFactor = 1.0;
         
+        // Get effective beam angle from the light data or derive from modifier name
+        // This affects the spread of the light visualization
+        let beamAngle = lightData.beamAngle || 110; // Default to wide if not specified
+        
+        // For lights with beam angle in the modifier name (e.g., Aputure LS 300X)
+        if (light.type === "Aputure LS 300X") {
+            // Extract the beam angle from the modifier name (e.g., "15° Beam")
+            const match = light.diffusion.match(/(\d+)°/);
+            if (match) {
+                beamAngle = parseInt(match[1]);
+            }
+        }
+        
+        // Adjust visualization based on the light type and settings
         switch (light.type) {
             case "ARRI SkyPanel S60-C":
-                baseColor = "169, 212, 255"; // RGB for light blue
+                // Color based on color temperature
+                baseColor = light.colorTemp === "3200K" ? 
+                           "255, 213, 170" : // Warm tungsten color
+                           "169, 212, 255";  // Cooler daylight color
+                
+                // Adjust the spread based on diffusion
+                if (light.diffusion === "Intensifier") {
+                    beamAngle = 95; // More focused
+                } else if (light.diffusion === "Heavy") {
+                    beamAngle = 125; // Wider spread
+                }
+                
                 maxRadius = 250;
                 break;
+                
             case "Aputure LS 300X":
-                baseColor = "255, 214, 138"; // RGB for light amber
-                maxRadius = 230;
+                // Fresnel light with very directional beam
+                baseColor = "255, 214, 138"; // Amber color
+                
+                // Radius calculation adjusts based on beam angle
+                // Narrower beams get more concentrated but smaller visual spread
+                if (beamAngle <= 15) {
+                    maxRadius = 180;
+                    radiusScaleFactor = 0.7; // More concentrated falloff 
+                } else if (beamAngle <= 30) {
+                    maxRadius = 200;
+                    radiusScaleFactor = 0.8;
+                } else if (beamAngle <= 45) {
+                    maxRadius = 220;
+                    radiusScaleFactor = 0.9;
+                } else {
+                    maxRadius = 230;
+                    radiusScaleFactor = 1.0;
+                }
                 break;
+                
             case "Litepanels Gemini 2x1":
-                baseColor = "186, 234, 255"; // RGB for sky blue
+                // More cyan-tint daylight than the SkyPanel
+                baseColor = light.colorTemp === "3200K" ? 
+                           "255, 202, 155" : // Warm tungsten color
+                           "186, 234, 255";  // Cooler daylight color with slight cyan tint
+                
+                // Adjust spread based on diffusion type
+                if (light.diffusion === "No Diffusion") {
+                    beamAngle = 95;
+                } else if (light.diffusion === "Heavy Diffusion") {
+                    beamAngle = 115;
+                }
+                
                 maxRadius = 230;
                 break;
+                
             case "Aputure MC":
-                baseColor = "255, 123, 123"; // RGB for light red
-                // Aputure MC is a small light with shorter range
-                maxRadius = 100; // Much smaller radius for this small light
-                radiusScaleFactor = 0.8; // Sharper falloff
+                // Smaller light with more dramatic falloff
+                // Color depends on color temperature
+                baseColor = light.colorTemp === "3200K" ? 
+                           "255, 159, 128" : // Warm reddish 
+                           "255, 123, 123";  // Cool reddish
+                           
+                // Drastically smaller radius and more concentrated
+                maxRadius = light.diffusion === "No Diffusion" ? 100 : 90;
+                radiusScaleFactor = light.diffusion === "No Diffusion" ? 0.8 : 0.9;
                 break;
+                
             default:
                 baseColor = "247, 195, 95"; // Default Haplon gold
         }
         
-        // Base the radius on how much light would reach the subject
-        // Special handling for the Aputure MC
+        // Base the radius on how much light would reach the subject and beam angle
+        // - Narrower beam angles = more concentrated, smaller visual spread but more intensity
+        // - Wider beam angles = larger visual spread but less intensity at distance
         let radius;
+        let innerRadius = 0; // Used for Fresnel lights to create a focused hotspot
         
-        if (light.type === "Aputure MC") {
-            // For the MC, a small light with rapid falloff
+        // Calculate the cone angle visualization - affects the gradient appearance
+        const coneRatio = Math.min(1.0, 100 / beamAngle); // Normalize to create visual effect
+        
+        if (light.type === "Aputure LS 300X") {
+            // Fresnel light has a more concentrated center beam with hotspot
+            // We'll use the beam angle to determine the visual spread
+            radius = Math.sqrt(light.intensity / 100) * maxRadius / Math.pow(distance, radiusScaleFactor); 
+            
+            // Create a hotspot effect for Fresnel - smaller inner radius for narrow beams
+            innerRadius = radius * (beamAngle <= 30 ? 0.2 : beamAngle <= 45 ? 0.3 : 0.4);
+        } else if (light.type === "Aputure MC") {
+            // Small light with very rapid falloff
             radius = Math.sqrt(light.intensity / 100) * maxRadius / Math.pow(distance, radiusScaleFactor);
             
-            // Additionally, cap the radius for the MC at closer distances
-            // This represents its limited throw distance
+            // Cap the radius based on distance to represent limited throw distance
             if (distance < 1.0) {
                 radius = Math.min(radius, maxRadius * 1.0);
             } else if (distance < 1.5) {
-                radius = Math.min(radius, maxRadius * 0.8);
+                radius = Math.min(radius, maxRadius * 0.7);
             } else if (distance < 2.0) {
-                radius = Math.min(radius, maxRadius * 0.6);
+                radius = Math.min(radius, maxRadius * 0.5);
             } else {
-                radius = Math.min(radius, maxRadius * 0.4);
+                radius = Math.min(radius, maxRadius * 0.3);
             }
         } else {
-            // Standard calculation for larger lights
+            // Standard calculation for panel lights
+            // Use the beam angle to adjust the visual spread
             radius = Math.sqrt(light.intensity / 100) * maxRadius / Math.sqrt(distance);
+            radius = radius * (beamAngle / 110); // Normalize against a standard 110° angle
         }
         
-        // Draw intensity circle
-        this.ctx.beginPath();
-        this.ctx.arc(light.x, light.y, radius, 0, Math.PI * 2);
+        // Draw intensity visualization
+        this.ctx.save();
         
-        // Create gradient based on light type with custom stops for each light
-        const gradient = this.ctx.createRadialGradient(light.x, light.y, 0, light.x, light.y, radius);
-        
-        if (light.type === "Aputure MC") {
-            // More concentrated, focused gradient for the small MC light
-            gradient.addColorStop(0, `rgba(${baseColor}, 0.8)`);
-            gradient.addColorStop(0.3, `rgba(${baseColor}, 0.4)`);
-            gradient.addColorStop(0.6, `rgba(${baseColor}, 0.2)`);
-            gradient.addColorStop(0.8, `rgba(${baseColor}, 0.1)`);
+        // For Fresnel lights, we'll create a more directional beam shape
+        if (light.type === "Aputure LS 300X") {
+            // Calculate angle from light to subject
+            const dx = SUBJECT.x - light.x;
+            const dy = SUBJECT.y - light.y;
+            const angle = Math.atan2(dy, dx);
+            
+            // Create a focused cone of light for Fresnel
+            // The smaller the beam angle, the more focused the cone
+            const coneAngle = (beamAngle / 2) * (Math.PI / 180); // Convert to radians
+            
+            // Create a cone/sector shape for the light
+            this.ctx.beginPath();
+            this.ctx.moveTo(light.x, light.y);
+            
+            // Draw an arc forming the cone edge
+            this.ctx.arc(light.x, light.y, radius, 
+                         angle - coneAngle, 
+                         angle + coneAngle);
+            
+            // Close the cone
+            this.ctx.closePath();
+            
+            // Create gradient along the cone
+            const gradient = this.ctx.createRadialGradient(light.x, light.y, innerRadius, light.x, light.y, radius);
+            
+            // More intense, concentrated gradient for Fresnel fixtures
+            gradient.addColorStop(0, `rgba(${baseColor}, 0.9)`);
+            gradient.addColorStop(0.2, `rgba(${baseColor}, 0.7)`);
+            gradient.addColorStop(0.5, `rgba(${baseColor}, 0.4)`);
+            gradient.addColorStop(0.8, `rgba(${baseColor}, 0.2)`);
             gradient.addColorStop(1, `rgba(${baseColor}, 0)`);
+            
+            this.ctx.fillStyle = gradient;
+            this.ctx.fill();
         } else {
-            // Standard gradient for larger lights
-            gradient.addColorStop(0, `rgba(${baseColor}, 0.7)`);
-            gradient.addColorStop(0.5, `rgba(${baseColor}, 0.3)`);
-            gradient.addColorStop(0.8, `rgba(${baseColor}, 0.1)`);
-            gradient.addColorStop(1, `rgba(${baseColor}, 0)`);
+            // For soft lights like panels, use a circular gradient
+            this.ctx.beginPath();
+            this.ctx.arc(light.x, light.y, radius, 0, Math.PI * 2);
+            
+            // Create gradient based on light type
+            const gradient = this.ctx.createRadialGradient(light.x, light.y, 0, light.x, light.y, radius);
+            
+            if (light.type === "Aputure MC") {
+                // More concentrated, focused gradient for the small MC light
+                gradient.addColorStop(0, `rgba(${baseColor}, 0.8)`);
+                gradient.addColorStop(0.3, `rgba(${baseColor}, 0.4)`);
+                gradient.addColorStop(0.6, `rgba(${baseColor}, 0.2)`);
+                gradient.addColorStop(0.8, `rgba(${baseColor}, 0.1)`);
+                gradient.addColorStop(1, `rgba(${baseColor}, 0)`);
+            } else {
+                // Standard gradient for larger panel lights
+                gradient.addColorStop(0, `rgba(${baseColor}, 0.7)`);
+                gradient.addColorStop(0.5, `rgba(${baseColor}, 0.3)`);
+                gradient.addColorStop(0.8, `rgba(${baseColor}, 0.1)`);
+                gradient.addColorStop(1, `rgba(${baseColor}, 0)`);
+            }
+            
+            this.ctx.fillStyle = gradient;
+            this.ctx.fill();
         }
-        
-        this.ctx.fillStyle = gradient;
-        this.ctx.fill();
         
         // Draw a line from the light to the subject to help visualize the connection
         this.ctx.beginPath();
         this.ctx.moveTo(light.x, light.y);
         this.ctx.lineTo(SUBJECT.x, SUBJECT.y);
-        this.ctx.strokeStyle = `rgba(${baseColor}, 0.3)`;
+        
+        // If there's an exposure warning, use a different color for the connection line
+        if (light.exposureWarning) {
+            this.ctx.strokeStyle = 'rgba(255, 100, 100, 0.4)'; // Red warning
+        } else {
+            this.ctx.strokeStyle = `rgba(${baseColor}, 0.4)`;
+        }
+        
         this.ctx.lineWidth = 1;
         this.ctx.stroke();
+        
+        // If there's an exposure warning, draw a warning indicator
+        if (light.exposureWarning) {
+            // Draw warning icon at the light position
+            this.ctx.font = 'bold 16px Arial';
+            this.ctx.fillStyle = 'rgba(255, 100, 100, 0.8)';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText('!', light.x, light.y - 25);
+        }
+        
+        this.ctx.restore();
     }
     
     drawLight(light, index) {
@@ -984,33 +1197,109 @@ class LightingDiagram {
         // Draw selected light info panel at the bottom right
         if (this.selectedLight !== null) {
             const light = this.lights[this.selectedLight];
+            const lightData = LIGHT_MODIFIERS[light.type];
             const distance = this.calculateDistance(light).toFixed(1);
             
+            // Calculate panel size - taller if we have warnings or equipment details
+            const hasWarning = light.exposureWarning;
             const panelX = this.canvas.width - 210;
-            const panelY = this.canvas.height - 100;
+            let panelY = this.canvas.height - (hasWarning ? 130 : 100);
             const panelWidth = 200;
-            const panelHeight = 90;
+            let panelHeight = hasWarning ? 120 : 90; // More height for warnings
             
             // Panel background
             this.ctx.fillStyle = 'rgba(20, 20, 20, 0.9)';
-            this.ctx.strokeStyle = '#F7C35F';
-            this.ctx.lineWidth = 1;
+            this.ctx.strokeStyle = light.exposureWarning ? 'rgba(255, 100, 100, 0.8)' : '#F7C35F';
+            this.ctx.lineWidth = light.exposureWarning ? 2 : 1; // Thicker border for warnings
             this.ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
             this.ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
             
-            // Panel title
+            // Panel title with equipment model
             this.ctx.font = 'bold 14px Arial';
             this.ctx.fillStyle = '#F7C35F';
             this.ctx.textAlign = 'left';
             this.ctx.fillText(`${light.type}`, panelX + 10, panelY + 20);
             
+            // Get reference lux and display it in the panel
+            const referenceLux = lightData.photometricData[light.diffusion]?.[light.colorTemp] || 
+                               lightData.photometricData[light.diffusion]?.[lightData.colorTemps[0]] || 
+                               lightData.photometricData[lightData.defaultModifier][lightData.colorTemps[0]];
+            
+            // Display effective light range
+            const effectiveRange = lightData.effectiveRange;
+            
             // Panel info
             this.ctx.font = '12px Arial';
             this.ctx.fillStyle = 'white';
+            
+            // Basic information
             this.ctx.fillText(`Distance: ${distance} meters`, panelX + 10, panelY + 40);
+            
+            // Color the intensity value red if at maximum
+            if (light.intensity >= 99.5) {
+                this.ctx.fillStyle = 'rgba(255, 100, 100, 0.8)';
+            }
             this.ctx.fillText(`Intensity: ${Math.round(light.intensity)}%`, panelX + 10, panelY + 55);
+            this.ctx.fillStyle = 'white'; // Reset color
+            
             this.ctx.fillText(`Modifier: ${light.diffusion}`, panelX + 10, panelY + 70);
             this.ctx.fillText(`Color Temp: ${light.colorTemp}`, panelX + 10, panelY + 85);
+            
+            // Add reference output value in small text
+            this.ctx.font = '10px Arial';
+            this.ctx.fillStyle = 'rgba(180, 180, 180, 0.8)';
+            this.ctx.fillText(`Output: ${referenceLux} lux @ ${lightData.referenceDistance}m`, panelX + 10, panelY + 100);
+            
+            // Add warning message if needed
+            if (light.exposureWarning) {
+                this.ctx.font = 'bold 12px Arial';
+                this.ctx.fillStyle = 'rgba(255, 100, 100, 0.8)';
+                this.ctx.fillText(`Warning: ${light.warningMessage}`, panelX + 10, panelY + 115);
+            }
+            
+            // Draw effective range indicator on a small ruler
+            const rulerX = panelX + 10;
+            const rulerY = hasWarning ? panelY + 130 : panelY + 115;
+            const rulerWidth = 180;
+            const rulerHeight = 10;
+            
+            if (panelY + rulerY + rulerHeight > this.canvas.height) {
+                // Skip drawing the ruler if it would go off-screen
+                return;
+            }
+            
+            // Extend panel height to include ruler
+            this.ctx.fillStyle = 'rgba(20, 20, 20, 0.9)';
+            this.ctx.fillRect(panelX, rulerY - 10, panelWidth, 25);
+            
+            // Draw ruler background
+            this.ctx.fillStyle = 'rgba(60, 60, 60, 0.8)';
+            this.ctx.fillRect(rulerX, rulerY, rulerWidth, rulerHeight);
+            
+            // Draw effective range on ruler
+            const rangeStart = Math.max(0, effectiveRange[0] / 12 * rulerWidth);
+            const rangeEnd = Math.min(rulerWidth, effectiveRange[1] / 12 * rulerWidth);
+            this.ctx.fillStyle = 'rgba(100, 200, 100, 0.8)';
+            this.ctx.fillRect(rulerX + rangeStart, rulerY, rangeEnd - rangeStart, rulerHeight);
+            
+            // Draw current distance marker on ruler
+            const distanceMarker = Math.min(rulerWidth, distance / 12 * rulerWidth);
+            this.ctx.fillStyle = distance < effectiveRange[0] || distance > effectiveRange[1] ?
+                              'rgba(255, 100, 100, 0.8)' :
+                              'rgba(255, 255, 255, 0.8)';
+            this.ctx.fillRect(rulerX + distanceMarker - 1, rulerY - 3, 2, rulerHeight + 6);
+            
+            // Draw ruler tick marks and labels
+            this.ctx.font = '8px Arial';
+            this.ctx.fillStyle = 'rgba(200, 200, 200, 0.8)';
+            this.ctx.textAlign = 'center';
+            
+            // Draw tick marks every 2 meters
+            for (let i = 0; i <= 12; i += 2) {
+                const tickX = rulerX + (i/12 * rulerWidth);
+                this.ctx.fillRect(tickX, rulerY - 2, 1, rulerHeight + 4);
+                this.ctx.fillText(`${i}m`, tickX, rulerY + rulerHeight + 8);
+            }
         }
     }
     
