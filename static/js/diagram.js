@@ -495,24 +495,53 @@ class LightingDiagram {
         // Reference values matching the main calculator
         const referenceDistance = 3.0; // meters - middle value from our dataset
         
-        // Inverse square law: illuminance ∝ 1/distance²
-        // At further distances, we need more intensity
-        // So intensity should increase with distance, not decrease
-        
-        // Calculate distance ratio squared
-        let distanceRatioSquared = Math.pow(distance / referenceDistance, 2);
-        
-        // Calculate intensity based on distance
-        // As distance increases, intensity needs to increase
-        let intensity = distanceRatioSquared * 100;
-        
-        // Cap intensity to 100%
-        intensity = Math.min(100, intensity);
-        
-        // Set the calculated intensity
-        light.intensity = Math.round(intensity * 100) / 100; // Round to 2 decimal places
-        
-        console.log(`Light at ${distance.toFixed(2)}m requires ${intensity.toFixed(2)}% intensity`);
+        // Special case: Aputure MC is a small on-camera light with different characteristics
+        // It has much shorter optimal distances (0.5m-2m instead of 3m-9m)
+        if (light.type === "Aputure MC") {
+            // For this small light, use a different reference distance
+            const mcReferenceDistance = 1.0; // 1 meter is more appropriate for this light
+            
+            // Calculate distance ratio squared
+            let distanceRatioSquared = Math.pow(distance / mcReferenceDistance, 2);
+            
+            // Calculate intensity based on distance
+            let intensity = distanceRatioSquared * 100;
+            
+            // Adjust the falloff curve to be more dramatic for this small light
+            // When very close (<0.5m), lower intensity significantly
+            if (distance < 0.5) {
+                intensity = intensity * (distance / 0.5);
+            }
+            
+            // Cap intensity to 100%
+            intensity = Math.min(100, intensity);
+            
+            // Set the calculated intensity
+            light.intensity = Math.round(intensity * 100) / 100; // Round to 2 decimal places
+            
+            console.log(`Aputure MC at ${distance.toFixed(2)}m requires ${intensity.toFixed(2)}% intensity`);
+        } else {
+            // Standard lights (SkyPanel, LS 300X, Gemini)
+            
+            // Inverse square law: illuminance ∝ 1/distance²
+            // At further distances, we need more intensity
+            // So intensity should increase with distance, not decrease
+            
+            // Calculate distance ratio squared
+            let distanceRatioSquared = Math.pow(distance / referenceDistance, 2);
+            
+            // Calculate intensity based on distance
+            // As distance increases, intensity needs to increase
+            let intensity = distanceRatioSquared * 100;
+            
+            // Cap intensity to 100%
+            intensity = Math.min(100, intensity);
+            
+            // Set the calculated intensity
+            light.intensity = Math.round(intensity * 100) / 100; // Round to 2 decimal places
+            
+            console.log(`Light at ${distance.toFixed(2)}m requires ${intensity.toFixed(2)}% intensity`);
+        }
         
         // Update light info display
         this.draw();
@@ -643,40 +672,79 @@ class LightingDiagram {
         // on the subject, which is actually the opposite of our light intensity calculation
         // (where we need more intensity at greater distances)
         
-        // Base the radius on how much light would reach the subject
-        const maxRadius = 250;
-        // Scale radius based on intensity and inverse of distance
-        const radius = Math.sqrt(light.intensity / 100) * maxRadius / Math.sqrt(distance);
-        
-        // Draw intensity circle
-        this.ctx.beginPath();
-        this.ctx.arc(light.x, light.y, radius, 0, Math.PI * 2);
-        
-        // Determine color based on light type
+        // Determine color and set parameters based on light type
         let baseColor;
+        let maxRadius = 250;
+        let radiusScaleFactor = 1.0;
+        
         switch (light.type) {
             case "ARRI SkyPanel S60-C":
                 baseColor = "169, 212, 255"; // RGB for light blue
+                maxRadius = 250;
                 break;
             case "Aputure LS 300X":
                 baseColor = "255, 214, 138"; // RGB for light amber
+                maxRadius = 230;
                 break;
             case "Litepanels Gemini 2x1":
                 baseColor = "186, 234, 255"; // RGB for sky blue
+                maxRadius = 230;
                 break;
             case "Aputure MC":
                 baseColor = "255, 123, 123"; // RGB for light red
+                // Aputure MC is a small light with shorter range
+                maxRadius = 100; // Much smaller radius for this small light
+                radiusScaleFactor = 0.8; // Sharper falloff
                 break;
             default:
                 baseColor = "247, 195, 95"; // Default Haplon gold
         }
         
-        // Create gradient based on light type
+        // Base the radius on how much light would reach the subject
+        // Special handling for the Aputure MC
+        let radius;
+        
+        if (light.type === "Aputure MC") {
+            // For the MC, a small light with rapid falloff
+            radius = Math.sqrt(light.intensity / 100) * maxRadius / Math.pow(distance, radiusScaleFactor);
+            
+            // Additionally, cap the radius for the MC at closer distances
+            // This represents its limited throw distance
+            if (distance < 1.0) {
+                radius = Math.min(radius, maxRadius * 1.0);
+            } else if (distance < 1.5) {
+                radius = Math.min(radius, maxRadius * 0.8);
+            } else if (distance < 2.0) {
+                radius = Math.min(radius, maxRadius * 0.6);
+            } else {
+                radius = Math.min(radius, maxRadius * 0.4);
+            }
+        } else {
+            // Standard calculation for larger lights
+            radius = Math.sqrt(light.intensity / 100) * maxRadius / Math.sqrt(distance);
+        }
+        
+        // Draw intensity circle
+        this.ctx.beginPath();
+        this.ctx.arc(light.x, light.y, radius, 0, Math.PI * 2);
+        
+        // Create gradient based on light type with custom stops for each light
         const gradient = this.ctx.createRadialGradient(light.x, light.y, 0, light.x, light.y, radius);
-        gradient.addColorStop(0, `rgba(${baseColor}, 0.7)`);
-        gradient.addColorStop(0.5, `rgba(${baseColor}, 0.3)`);
-        gradient.addColorStop(0.8, `rgba(${baseColor}, 0.1)`);
-        gradient.addColorStop(1, `rgba(${baseColor}, 0)`);
+        
+        if (light.type === "Aputure MC") {
+            // More concentrated, focused gradient for the small MC light
+            gradient.addColorStop(0, `rgba(${baseColor}, 0.8)`);
+            gradient.addColorStop(0.3, `rgba(${baseColor}, 0.4)`);
+            gradient.addColorStop(0.6, `rgba(${baseColor}, 0.2)`);
+            gradient.addColorStop(0.8, `rgba(${baseColor}, 0.1)`);
+            gradient.addColorStop(1, `rgba(${baseColor}, 0)`);
+        } else {
+            // Standard gradient for larger lights
+            gradient.addColorStop(0, `rgba(${baseColor}, 0.7)`);
+            gradient.addColorStop(0.5, `rgba(${baseColor}, 0.3)`);
+            gradient.addColorStop(0.8, `rgba(${baseColor}, 0.1)`);
+            gradient.addColorStop(1, `rgba(${baseColor}, 0)`);
+        }
         
         this.ctx.fillStyle = gradient;
         this.ctx.fill();
