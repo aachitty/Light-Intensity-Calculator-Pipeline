@@ -56,6 +56,30 @@ const LIGHT_ICONS = {
     `
 };
 
+// Define light-specific modifiers and color temps based on backend data
+const LIGHT_MODIFIERS = {
+    "ARRI SkyPanel S60-C": {
+        modifiers: ["Standard", "Lite", "Heavy", "Intensifier"],
+        colorTemps: ["3200K", "5600K"],
+        defaultModifier: "Standard"
+    },
+    "Aputure LS 300X": {
+        modifiers: ["15° Beam", "30° Beam", "45° Beam", "60° Beam"],
+        colorTemps: ["5600K"],
+        defaultModifier: "15° Beam"
+    },
+    "Litepanels Gemini 2x1": {
+        modifiers: ["No Diffusion", "Light Diffusion", "Medium Diffusion", "Heavy Diffusion"],
+        colorTemps: ["3200K", "5600K"],
+        defaultModifier: "No Diffusion"
+    },
+    "Aputure MC": {
+        modifiers: ["No Diffusion", "With Diffusion"],
+        colorTemps: ["3200K", "5600K"],
+        defaultModifier: "No Diffusion"
+    }
+};
+
 class LightingDiagram {
     constructor(containerId) {
         // Get the container element
@@ -135,10 +159,7 @@ class LightingDiagram {
             <div class="diagram-form-group">
                 <label class="diagram-label">Modifier/Diffusion:</label>
                 <select class="diagram-select modifier-select" disabled>
-                    <option value="Standard">Standard</option>
-                    <option value="Lite">Lite</option>
-                    <option value="Heavy">Heavy</option>
-                    <option value="Intensifier">Intensifier</option>
+                    <!-- Options will be populated dynamically -->
                 </select>
             </div>
             <div class="diagram-form-group">
@@ -249,13 +270,17 @@ class LightingDiagram {
     }
     
     addLight(type, x, y) {
-        // Create a new light object
+        // Get the default modifier and color temperature for this light type
+        const defaultModifier = LIGHT_MODIFIERS[type].defaultModifier;
+        const defaultColorTemp = LIGHT_MODIFIERS[type].colorTemps[0];
+        
+        // Create a new light object with appropriate defaults
         const light = {
             type: type,
             x: x,
             y: y,
-            diffusion: "Standard", // Default diffusion
-            colorTemp: "5600K",    // Default color temp
+            diffusion: defaultModifier,
+            colorTemp: defaultColorTemp,
             intensity: 100        // Default intensity (percentage)
         };
         
@@ -512,11 +537,10 @@ class LightingDiagram {
                 // SkyPanel S60-C has highest output at 3m with Standard diffusion: 1305 lux
                 // Using the product's real photometric data
                 const skyPanelReferenceDistance = 3.0; // meters
-                const skyPanelReferenceLux = light.diffusion === "Intensifier" ? 1700 : 
+                const skyPanelReferenceLux = light.diffusion === "Intensifier" ? 2011 : 
                                             light.diffusion === "Standard" ? 1305 : 
-                                            light.diffusion === "Light" ? 920 : 
-                                            light.diffusion === "Medium" ? 680 : 
-                                            light.diffusion === "Heavy" ? 450 : 1305;
+                                            light.diffusion === "Lite" ? 1328 : 
+                                            light.diffusion === "Heavy" ? 1031 : 1305;
                 
                 // Distance ratio squared (inverse square law)
                 const skyPanelDistanceRatio = Math.pow(distance / skyPanelReferenceDistance, 2);
@@ -536,22 +560,22 @@ class LightingDiagram {
                 // Aputure LS 300X has different characteristics from SkyPanel
                 // Higher output but narrower beam angle
                 const ls300xReferenceDistance = 3.0; // meters
-                const ls300xReferenceLux = light.diffusion === "Bare Bulb" ? 1900 :
-                                          light.diffusion === "15° Hyper-Reflector" ? 10500 :
-                                          light.diffusion === "30° Standard Reflector" ? 4400 :
-                                          light.diffusion === "60° Soft Light Reflector" ? 1600 : 4400;
+                const ls300xReferenceLux = light.diffusion === "15° Beam" ? 4400 :
+                                          light.diffusion === "30° Beam" ? 2110 :
+                                          light.diffusion === "45° Beam" ? 1166 :
+                                          light.diffusion === "60° Beam" ? 644 : 4400;
                                           
                 // Calculate intensity with falloff
                 const ls300xDistanceRatio = Math.pow(distance / ls300xReferenceDistance, 2);
                 
-                // Adjust for the diffusion type - Standard Reflector (4400 lux) is our reference
-                const ls300xDiffusionFactor = ls300xReferenceLux / 4400; // Normalize to Standard Reflector
+                // Adjust for the diffusion type - 15° Beam (4400 lux) is our reference
+                const ls300xDiffusionFactor = ls300xReferenceLux / 4400; // Normalize to 15° Beam
                 
                 // Calculate intensity needed with real photometric data
                 intensity = ls300xDistanceRatio * 100 * exposureFactor / ls300xDiffusionFactor;
                 
                 // For narrow beam angles, intensity falloff at very long distances due to beam angle
-                if (light.diffusion === "15° Hyper-Reflector" && distance > 5) {
+                if (light.diffusion === "15° Beam" && distance > 5) {
                     intensity = intensity * 0.85; // Slight reduction in effectiveness at very long distances
                 }
                 
@@ -561,15 +585,16 @@ class LightingDiagram {
             case "Litepanels Gemini 2x1":
                 // Gemini 2x1 has moderate output with wide, soft light pattern
                 const geminiReferenceDistance = 3.0; // meters
-                const geminiReferenceLux = light.diffusion === "Raw" ? 1100 :
-                                         light.diffusion === "Dome Diffuser" ? 780 :
-                                         light.diffusion === "Honeycomb Grid" ? 850 : 1100;
+                const geminiReferenceLux = light.diffusion === "No Diffusion" ? 2780 :
+                                         light.diffusion === "Light Diffusion" ? 2222 :
+                                         light.diffusion === "Medium Diffusion" ? 1666 :
+                                         light.diffusion === "Heavy Diffusion" ? 1111 : 2780;
                                           
                 // Calculate intensity with falloff
                 const geminiDistanceRatio = Math.pow(distance / geminiReferenceDistance, 2);
                 
-                // Adjust for the diffusion type - Raw (1100 lux) is our reference
-                const geminiDiffusionFactor = geminiReferenceLux / 1100; // Normalize to Raw
+                // Adjust for the diffusion type - "No Diffusion" (2780 lux) is our reference
+                const geminiDiffusionFactor = geminiReferenceLux / 2780; // Normalize to No Diffusion
                 
                 // Calculate intensity needed with real photometric data
                 intensity = geminiDistanceRatio * 100 * exposureFactor / geminiDiffusionFactor;
@@ -581,7 +606,8 @@ class LightingDiagram {
                 // Aputure MC is a small on-camera light with different characteristics
                 // It has much shorter optimal distances (0.5m-2m instead of 3m-9m)
                 const mcReferenceDistance = 1.0; // 1 meter is more appropriate for this light
-                const mcReferenceLux = 100; // Much lower output than the larger fixtures
+                const mcReferenceLux = light.diffusion === "No Diffusion" ? 100 : 
+                                      light.diffusion === "With Diffusion" ? 80 : 100; // Much lower output than the larger fixtures
                 
                 // Calculate distance ratio squared
                 let mcDistanceRatio = Math.pow(distance / mcReferenceDistance, 2);
@@ -665,27 +691,49 @@ class LightingDiagram {
             // Update values to match the selected light
             const light = this.lights[this.selectedLight];
             
-            // Find or create option for diffusion
-            let diffusionOption = Array.from(modifierSelect.options).find(opt => opt.value === light.diffusion);
-            if (!diffusionOption) {
-                diffusionOption = new Option(light.diffusion, light.diffusion);
-                modifierSelect.add(diffusionOption);
-            }
-            modifierSelect.value = light.diffusion;
+            // Clear existing modifier options and add the appropriate ones for this light type
+            modifierSelect.innerHTML = '';
+            const lightModifiers = LIGHT_MODIFIERS[light.type].modifiers;
             
-            // Find or create option for color temp
-            let colorTempOption = Array.from(colorTempSelect.options).find(opt => opt.value === light.colorTemp);
-            if (!colorTempOption) {
-                const label = light.colorTemp === "3200K" ? "3200K (Tungsten)" : "5600K (Daylight)";
-                colorTempOption = new Option(label, light.colorTemp);
-                colorTempSelect.add(colorTempOption);
+            lightModifiers.forEach(modifier => {
+                const option = new Option(modifier, modifier);
+                modifierSelect.add(option);
+            });
+            
+            // Set the current value or default to the first option if the current isn't available
+            if (lightModifiers.includes(light.diffusion)) {
+                modifierSelect.value = light.diffusion;
+            } else {
+                light.diffusion = lightModifiers[0]; // Update the light's diffusion to the first available
+                modifierSelect.value = light.diffusion;
             }
-            colorTempSelect.value = light.colorTemp;
+            
+            // Similarly, update color temperature options
+            colorTempSelect.innerHTML = '';
+            const lightColorTemps = LIGHT_MODIFIERS[light.type].colorTemps;
+            
+            lightColorTemps.forEach(temp => {
+                const label = temp === "3200K" ? "3200K (Tungsten)" : "5600K (Daylight)";
+                const option = new Option(label, temp);
+                colorTempSelect.add(option);
+            });
+            
+            // Set the current value or default to the first option
+            if (lightColorTemps.includes(light.colorTemp)) {
+                colorTempSelect.value = light.colorTemp;
+            } else {
+                light.colorTemp = lightColorTemps[0]; // Update the light's color temp
+                colorTempSelect.value = light.colorTemp;
+            }
         } else {
             // Disable controls when nothing is selected
             modifierSelect.disabled = true;
             colorTempSelect.disabled = true;
             removeButton.disabled = this.lights.length === 0;
+            
+            // Clear the dropdowns when no light is selected
+            modifierSelect.innerHTML = '<option value="">-- Select a light first --</option>';
+            colorTempSelect.innerHTML = '<option value="">-- Select a light first --</option>';
         }
     }
     
