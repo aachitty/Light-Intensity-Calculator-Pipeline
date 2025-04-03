@@ -29,12 +29,11 @@ const LIGHT_TYPES = {
     }
 };
 
-// Subject dimensions
+// Subject dimensions - now a small circle
 const SUBJECT = {
     x: CANVAS_WIDTH / 2,
     y: CANVAS_HEIGHT / 2,
-    width: 60,
-    height: 100
+    radius: 20 // Small circle radius
 };
 
 // SVG icon paths for each light type (can be replaced with actual SVG files)
@@ -306,11 +305,16 @@ class LightingDiagram {
             const light = this.lights[i];
             const lightType = LIGHT_TYPES[light.type];
             
-            // Check if the point is within the light's bounds
-            if (x >= light.x - lightType.width/2 && 
-                x <= light.x + lightType.width/2 && 
-                y >= light.y - lightType.height/2 && 
-                y <= light.y + lightType.height/2) {
+            // Make the hit area slightly larger than the visual element for easier selection
+            const hitPadding = 10; // Extra padding around the light to make selection easier
+            
+            // Check if the point is within the light's bounds (with padding)
+            if (x >= light.x - lightType.width/2 - hitPadding && 
+                x <= light.x + lightType.width/2 + hitPadding && 
+                y >= light.y - lightType.height/2 - hitPadding && 
+                y <= light.y + lightType.height/2 + hitPadding) {
+                
+                console.log(`Hit light ${i} at position (${light.x}, ${light.y})`);
                 return i;
             }
         }
@@ -319,9 +323,17 @@ class LightingDiagram {
     }
     
     handleMouseDown(e) {
+        // Get the mouse position relative to the canvas
         const rect = this.canvas.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
+        // Calculate the scaling factor between canvas coordinates and display size
+        const scaleX = this.canvas.width / rect.width;
+        const scaleY = this.canvas.height / rect.height;
+        
+        // Apply the scaling to get the true canvas coordinates
+        const mouseX = (e.clientX - rect.left) * scaleX;
+        const mouseY = (e.clientY - rect.top) * scaleY;
+        
+        console.log("Mouse down at:", mouseX, mouseY);
         
         // Check if we clicked on a light
         const lightIndex = this.getLightAt(mouseX, mouseY);
@@ -335,6 +347,9 @@ class LightingDiagram {
             this.dragOffset.x = light.x - mouseX;
             this.dragOffset.y = light.y - mouseY;
             this.isDragging = true;
+            
+            console.log("Selected light:", lightIndex, "at position:", light.x, light.y);
+            console.log("Drag offset:", this.dragOffset.x, this.dragOffset.y);
             
             // Update the light settings controls
             this.updateLightSettingsControls();
@@ -350,14 +365,22 @@ class LightingDiagram {
     
     handleMouseMove(e) {
         if (this.isDragging && this.selectedLight !== null) {
+            // Get the mouse position relative to the canvas with scaling
             const rect = this.canvas.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
+            const scaleX = this.canvas.width / rect.width;
+            const scaleY = this.canvas.height / rect.height;
+            
+            const mouseX = (e.clientX - rect.left) * scaleX;
+            const mouseY = (e.clientY - rect.top) * scaleY;
             
             // Update the light's position with offset
             const light = this.lights[this.selectedLight];
             light.x = mouseX + this.dragOffset.x;
             light.y = mouseY + this.dragOffset.y;
+            
+            // Optional: Ensure the light stays within the canvas bounds
+            light.x = Math.max(0, Math.min(this.canvas.width, light.x));
+            light.y = Math.max(0, Math.min(this.canvas.height, light.y));
             
             // Recalculate the light settings
             this.calculateLightSettings(this.selectedLight);
@@ -376,8 +399,16 @@ class LightingDiagram {
         if (e.touches.length === 1) {
             const touch = e.touches[0];
             const rect = this.canvas.getBoundingClientRect();
-            const touchX = touch.clientX - rect.left;
-            const touchY = touch.clientY - rect.top;
+            
+            // Calculate the scaling factor between canvas coordinates and display size
+            const scaleX = this.canvas.width / rect.width;
+            const scaleY = this.canvas.height / rect.height;
+            
+            // Apply the scaling to get the true canvas coordinates
+            const touchX = (touch.clientX - rect.left) * scaleX;
+            const touchY = (touch.clientY - rect.top) * scaleY;
+            
+            console.log("Touch start at:", touchX, touchY);
             
             // Check if we touched a light
             const lightIndex = this.getLightAt(touchX, touchY);
@@ -391,6 +422,9 @@ class LightingDiagram {
                 this.dragOffset.x = light.x - touchX;
                 this.dragOffset.y = light.y - touchY;
                 this.isDragging = true;
+                
+                console.log("Selected light (touch):", lightIndex, "at position:", light.x, light.y);
+                console.log("Touch drag offset:", this.dragOffset.x, this.dragOffset.y);
                 
                 // Update the light settings controls
                 this.updateLightSettingsControls();
@@ -410,13 +444,23 @@ class LightingDiagram {
         if (this.isDragging && this.selectedLight !== null && e.touches.length === 1) {
             const touch = e.touches[0];
             const rect = this.canvas.getBoundingClientRect();
-            const touchX = touch.clientX - rect.left;
-            const touchY = touch.clientY - rect.top;
+            
+            // Calculate the scaling factor between canvas coordinates and display size
+            const scaleX = this.canvas.width / rect.width;
+            const scaleY = this.canvas.height / rect.height;
+            
+            // Apply the scaling to get the true canvas coordinates
+            const touchX = (touch.clientX - rect.left) * scaleX;
+            const touchY = (touch.clientY - rect.top) * scaleY;
             
             // Update the light's position with offset
             const light = this.lights[this.selectedLight];
             light.x = touchX + this.dragOffset.x;
             light.y = touchY + this.dragOffset.y;
+            
+            // Optional: Ensure the light stays within the canvas bounds
+            light.x = Math.max(0, Math.min(this.canvas.width, light.x));
+            light.y = Math.max(0, Math.min(this.canvas.height, light.y));
             
             // Recalculate the light settings
             this.calculateLightSettings(this.selectedLight);
@@ -556,50 +600,27 @@ class LightingDiagram {
     }
     
     drawSubject() {
-        // Draw the subject (a person icon)
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-        
-        // Draw a simple person silhouette
+        // Draw the subject as a small circle
         const x = SUBJECT.x;
         const y = SUBJECT.y;
-        const width = SUBJECT.width;
-        const height = SUBJECT.height;
+        const radius = SUBJECT.radius;
         
-        // Head
+        // Draw circle
         this.ctx.beginPath();
-        this.ctx.arc(x, y - height/2 + 15, 15, 0, Math.PI * 2);
+        this.ctx.arc(x, y, radius, 0, Math.PI * 2);
+        this.ctx.fillStyle = '#F7C35F'; // Haplon gold color
         this.ctx.fill();
         
-        // Body
-        this.ctx.beginPath();
-        this.ctx.moveTo(x, y - height/2 + 30);
-        this.ctx.lineTo(x, y + height/2 - 20);
-        this.ctx.lineWidth = 5;
+        // Draw outline
         this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-        this.ctx.stroke();
-        
-        // Arms
-        this.ctx.beginPath();
-        this.ctx.moveTo(x - 20, y - height/4);
-        this.ctx.lineTo(x + 20, y - height/4);
-        this.ctx.stroke();
-        
-        // Legs
-        this.ctx.beginPath();
-        this.ctx.moveTo(x, y + height/2 - 20);
-        this.ctx.lineTo(x - 10, y + height/2);
-        this.ctx.stroke();
-        
-        this.ctx.beginPath();
-        this.ctx.moveTo(x, y + height/2 - 20);
-        this.ctx.lineTo(x + 10, y + height/2);
+        this.ctx.lineWidth = 2;
         this.ctx.stroke();
         
         // Label
-        this.ctx.fillStyle = '#F7C35F';
+        this.ctx.fillStyle = 'white';
         this.ctx.font = '14px Arial';
         this.ctx.textAlign = 'center';
-        this.ctx.fillText('Subject', x, y + height/2 + 20);
+        this.ctx.fillText('Subject', x, y + radius + 20);
     }
     
     drawLightIntensity(light) {
