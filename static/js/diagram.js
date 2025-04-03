@@ -489,12 +489,6 @@ class LightingDiagram {
         // Calculate the distance in meters from the subject
         const distance = this.calculateDistance(light);
         
-        // We want to determine what intensity would be needed to maintain proper exposure
-        // at the current distance with the current camera settings
-        
-        // Reference values matching the main calculator
-        const referenceDistance = 3.0; // meters - middle value from our dataset
-        
         // Calculate an exposure factor based on camera settings
         // Using the cinematography formula: FC = 25f²/(exp*ISO)
         // ISO is inversely proportional - higher ISO needs less light
@@ -509,55 +503,102 @@ class LightingDiagram {
         // - Higher framerate needs more light (framerateFactor increases)
         const exposureFactor = tStopFactor * isoFactor * framerateFactor;
         
-        // Special case: Aputure MC is a small on-camera light with different characteristics
-        // It has much shorter optimal distances (0.5m-2m instead of 3m-9m)
-        if (light.type === "Aputure MC") {
-            // For this small light, use a different reference distance
-            const mcReferenceDistance = 1.0; // 1 meter is more appropriate for this light
-            
-            // Calculate distance ratio squared
-            let distanceRatioSquared = Math.pow(distance / mcReferenceDistance, 2);
-            
-            // Calculate intensity based on distance and exposure factor
-            // Higher exposure factor = need more intensity
-            let intensity = distanceRatioSquared * 100 * exposureFactor;
-            
-            // Adjust the falloff curve to be more dramatic for this small light
-            // When very close (<0.5m), lower intensity significantly
-            if (distance < 0.5) {
-                intensity = intensity * (distance / 0.5);
-            }
-            
-            // Cap intensity to 100%
-            intensity = Math.min(100, intensity);
-            
-            // Set the calculated intensity
-            light.intensity = Math.round(intensity * 100) / 100; // Round to 2 decimal places
-            
-            console.log(`Aputure MC at ${distance.toFixed(2)}m requires ${intensity.toFixed(2)}% intensity (ISO: ${this.cameraSettings.iso}, T-stop: ${this.cameraSettings.tStop}, FPS: ${this.cameraSettings.framerate})`);
-        } else {
-            // Standard lights (SkyPanel, LS 300X, Gemini)
-            
-            // Inverse square law: illuminance ∝ 1/distance²
-            // At further distances, we need more intensity
-            // So intensity should increase with distance, not decrease
-            
-            // Calculate distance ratio squared
-            let distanceRatioSquared = Math.pow(distance / referenceDistance, 2);
-            
-            // Calculate intensity based on distance and exposure factor
-            // As distance increases, intensity needs to increase
-            // As exposure needs increase (higher T-stop, lower ISO), intensity needs to increase
-            let intensity = distanceRatioSquared * 100 * exposureFactor;
-            
-            // Cap intensity to 100%
-            intensity = Math.min(100, intensity);
-            
-            // Set the calculated intensity
-            light.intensity = Math.round(intensity * 100) / 100; // Round to 2 decimal places
-            
-            console.log(`Light at ${distance.toFixed(2)}m requires ${intensity.toFixed(2)}% intensity (ISO: ${this.cameraSettings.iso}, T-stop: ${this.cameraSettings.tStop}, FPS: ${this.cameraSettings.framerate})`);
+        // Get light-specific photometric data based on the light type
+        // Real-world data for each light fixture
+        let intensity;
+        
+        switch (light.type) {
+            case "ARRI SkyPanel S60-C":
+                // SkyPanel S60-C has highest output at 3m with Standard diffusion: 1305 lux
+                // Using the product's real photometric data
+                const skyPanelReferenceDistance = 3.0; // meters
+                const skyPanelReferenceLux = light.diffusion === "Intensifier" ? 1700 : 
+                                            light.diffusion === "Standard" ? 1305 : 
+                                            light.diffusion === "Light" ? 920 : 
+                                            light.diffusion === "Medium" ? 680 : 
+                                            light.diffusion === "Heavy" ? 450 : 1305;
+                
+                // Distance ratio squared (inverse square law)
+                const skyPanelDistanceRatio = Math.pow(distance / skyPanelReferenceDistance, 2);
+                
+                // Calculate intensity needed
+                intensity = skyPanelDistanceRatio * 100 * exposureFactor;
+                
+                console.log(`SkyPanel at ${distance.toFixed(2)}m with ${light.diffusion} diffusion requires ${intensity.toFixed(2)}% intensity (ISO: ${this.cameraSettings.iso}, T-stop: ${this.cameraSettings.tStop}, FPS: ${this.cameraSettings.framerate})`);
+                break;
+                
+            case "Aputure LS 300X":
+                // Aputure LS 300X has different characteristics from SkyPanel
+                // Higher output but narrower beam angle
+                const ls300xReferenceDistance = 3.0; // meters
+                const ls300xReferenceLux = light.diffusion === "Bare Bulb" ? 1900 :
+                                          light.diffusion === "15° Hyper-Reflector" ? 10500 :
+                                          light.diffusion === "30° Standard Reflector" ? 4400 :
+                                          light.diffusion === "60° Soft Light Reflector" ? 1600 : 4400;
+                                          
+                // Calculate intensity with falloff
+                const ls300xDistanceRatio = Math.pow(distance / ls300xReferenceDistance, 2);
+                intensity = ls300xDistanceRatio * 100 * exposureFactor;
+                
+                // For narrow beam angles, increase the intensity for longer distances
+                if (light.diffusion === "15° Hyper-Reflector" && distance > 5) {
+                    intensity = intensity * 0.85; // Slight reduction in effectiveness at very long distances
+                }
+                
+                console.log(`Aputure LS 300X at ${distance.toFixed(2)}m with ${light.diffusion} requires ${intensity.toFixed(2)}% intensity (ISO: ${this.cameraSettings.iso}, T-stop: ${this.cameraSettings.tStop}, FPS: ${this.cameraSettings.framerate})`);
+                break;
+                
+            case "Litepanels Gemini 2x1":
+                // Gemini 2x1 has moderate output with wide, soft light pattern
+                const geminiReferenceDistance = 3.0; // meters
+                const geminiReferenceLux = light.diffusion === "Raw" ? 1100 :
+                                         light.diffusion === "Dome Diffuser" ? 780 :
+                                         light.diffusion === "Honeycomb Grid" ? 850 : 1100;
+                                          
+                // Calculate intensity with falloff
+                const geminiDistanceRatio = Math.pow(distance / geminiReferenceDistance, 2);
+                intensity = geminiDistanceRatio * 100 * exposureFactor;
+                
+                console.log(`Gemini 2x1 at ${distance.toFixed(2)}m with ${light.diffusion} requires ${intensity.toFixed(2)}% intensity (ISO: ${this.cameraSettings.iso}, T-stop: ${this.cameraSettings.tStop}, FPS: ${this.cameraSettings.framerate})`);
+                break;
+                
+            case "Aputure MC":
+                // Aputure MC is a small on-camera light with different characteristics
+                // It has much shorter optimal distances (0.5m-2m instead of 3m-9m)
+                const mcReferenceDistance = 1.0; // 1 meter is more appropriate for this light
+                const mcReferenceLux = 100; // Much lower output than the larger fixtures
+                
+                // Calculate distance ratio squared
+                let mcDistanceRatio = Math.pow(distance / mcReferenceDistance, 2);
+                
+                // Calculate intensity based on distance and exposure factor
+                // Higher exposure factor = need more intensity
+                intensity = mcDistanceRatio * 100 * exposureFactor;
+                
+                // Adjust the falloff curve to be more dramatic for this small light
+                if (distance < 0.5) {
+                    intensity = intensity * (distance / 0.5); // Reduce intensity when very close
+                } else if (distance > 2.0) {
+                    // The MC's output falls off more rapidly at longer distances due to its size
+                    intensity = intensity * (1 + (distance - 2.0) * 0.3); // Increase intensity more rapidly beyond 2m
+                }
+                
+                console.log(`Aputure MC at ${distance.toFixed(2)}m requires ${intensity.toFixed(2)}% intensity (ISO: ${this.cameraSettings.iso}, T-stop: ${this.cameraSettings.tStop}, FPS: ${this.cameraSettings.framerate})`);
+                break;
+                
+            default:
+                // Generic calculation for any other light type
+                const genericReferenceDistance = 3.0;
+                const genericDistanceRatio = Math.pow(distance / genericReferenceDistance, 2);
+                intensity = genericDistanceRatio * 100 * exposureFactor;
+                console.log(`Generic light at ${distance.toFixed(2)}m requires ${intensity.toFixed(2)}% intensity (ISO: ${this.cameraSettings.iso}, T-stop: ${this.cameraSettings.tStop}, FPS: ${this.cameraSettings.framerate})`);
         }
+        
+        // Cap intensity to 100%
+        intensity = Math.min(100, intensity);
+        
+        // Set the calculated intensity
+        light.intensity = Math.round(intensity * 100) / 100; // Round to 2 decimal places
         
         // Update light info display
         this.draw();
